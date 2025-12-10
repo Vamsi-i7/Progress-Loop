@@ -1,6 +1,10 @@
+
 import { scheduleTasks } from '../services/scheduler';
 import { StudyPlan, BusySlot } from '../types';
 import { addMinutes } from '../utils/dateMath';
+
+declare const describe: (name: string, fn: () => void) => void;
+declare const it: (name: string, fn: () => void) => void;
 
 // Mock Test Suite
 describe('Scheduler', () => {

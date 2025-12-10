@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { StoreProvider, useStore } from './context/StoreContext';
@@ -41,7 +40,7 @@ const ProtectedRoute = () => {
 };
 
 // Public Route Component
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+const PublicRoute = ({ children }: { children?: React.ReactNode }) => {
     const { isAuthenticated } = useStore();
     return isAuthenticated ? <Navigate to="/dashboard" replace /> : <>{children}</>;
 };

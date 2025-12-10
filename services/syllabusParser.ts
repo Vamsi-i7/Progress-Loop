@@ -1,186 +1,74 @@
 
-import { StudyPlan, PlanTask } from '../types';
+import { Node } from '../types';
+import { GoogleGenAI, Type } from "@google/genai";
 import { addMinutes } from '../utils/dateMath';
 
-/**
- * Simulates AI ingestion of a PDF/Image syllabus.
- * Detects subject context from filename and generates a structured study plan
- * with Units, Topics, Deadlines, Weightage, and Study Hours.
- */
-export const parseSyllabus = async (file: File): Promise<StudyPlan> => {
-    return new Promise((resolve) => {
-        // Simulate processing delay (OCR + AI Analysis)
-        setTimeout(() => {
-            const now = new Date();
-            const planId = `p_syllabus_${Date.now()}`;
-            const fileName = file.name.toLowerCase();
+export const parseContentToNodes = async (content: string, title: string): Promise<Node[]> => {
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: `Analyze the following course content and break it down into a hierarchical learning roadmap.
+            Estimate time (minutes) for each node based on complexity. Weight is 1-100 importance.
             
-            let subject = 'General';
-            let tasks: PlanTask[] = [];
-
-            // Smart detection based on filename keywords
-            if (fileName.includes('math') || fileName.includes('calculus') || fileName.includes('algebra')) {
-                subject = 'Mathematics';
-                tasks = [
-                     { 
-                         id: `${planId}_t1`, 
-                         title: 'Unit 1: Limits & Continuity', 
-                         isCompleted: false, 
-                         estimatedMinutes: 120, // 2 Hours
-                         difficulty: 'medium', 
-                         subjectWeightage: 15, // 15% Marks
-                         dueDate: addMinutes(now, 24 * 60 * 3).toISOString() 
-                     },
-                     { 
-                         id: `${planId}_t2`, 
-                         title: 'Unit 2: Derivatives & Applications', 
-                         isCompleted: false, 
-                         estimatedMinutes: 180, // 3 Hours
-                         difficulty: 'hard', 
-                         subjectWeightage: 35, 
-                         dueDate: addMinutes(now, 24 * 60 * 7).toISOString() 
-                     },
-                     { 
-                         id: `${planId}_t3`, 
-                         title: 'Unit 3: Integration Techniques', 
-                         isCompleted: false, 
-                         estimatedMinutes: 150, 
-                         difficulty: 'hard', 
-                         subjectWeightage: 30, 
-                         dueDate: addMinutes(now, 24 * 60 * 14).toISOString() 
-                     },
-                     { 
-                         id: `${planId}_t4`, 
-                         title: 'Unit 4: Differential Equations', 
-                         isCompleted: false, 
-                         estimatedMinutes: 90, 
-                         difficulty: 'medium', 
-                         subjectWeightage: 20, 
-                         dueDate: addMinutes(now, 24 * 60 * 21).toISOString() 
-                     }
-                ];
-            } else if (fileName.includes('phys') || fileName.includes('science')) {
-                subject = 'Physics';
-                tasks = [
-                    { 
-                        id: `${planId}_t1`, 
-                        title: 'Module 1: Kinematics 1D & 2D', 
-                        isCompleted: false, 
-                        estimatedMinutes: 90, 
-                        difficulty: 'medium', 
-                        subjectWeightage: 15, 
-                        dueDate: addMinutes(now, 24 * 60 * 3).toISOString() 
-                    },
-                    { 
-                        id: `${planId}_t2`, 
-                        title: 'Module 2: Newton\'s Laws of Motion', 
-                        isCompleted: false, 
-                        estimatedMinutes: 120, 
-                        difficulty: 'hard', 
-                        subjectWeightage: 25, 
-                        dueDate: addMinutes(now, 24 * 60 * 6).toISOString() 
-                    },
-                    { 
-                        id: `${planId}_t3`, 
-                        title: 'Module 3: Work, Energy & Power', 
-                        isCompleted: false, 
-                        estimatedMinutes: 100, 
-                        difficulty: 'medium', 
-                        subjectWeightage: 20, 
-                        dueDate: addMinutes(now, 24 * 60 * 10).toISOString() 
-                    },
-                     { 
-                        id: `${planId}_t4`, 
-                        title: 'Module 4: Thermodynamics', 
-                        isCompleted: false, 
-                        estimatedMinutes: 150, 
-                        difficulty: 'hard', 
-                        subjectWeightage: 40, 
-                        dueDate: addMinutes(now, 24 * 60 * 20).toISOString() 
+            Course Title: ${title}
+            Content: ${content.substring(0, 30000)} ... (truncated)`,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            id: { type: Type.STRING },
+                            title: { type: Type.STRING },
+                            content: { type: Type.STRING, description: "Brief description of topics covered" },
+                            level: { type: Type.INTEGER, description: "0 for Module, 1 for Topic, 2 for Subtopic" },
+                            estimatedMinutes: { type: Type.INTEGER },
+                            difficulty: { type: Type.STRING, enum: ["easy", "medium", "hard"] },
+                            weight: { type: Type.INTEGER }
+                        },
+                        required: ["id", "title", "content", "level", "estimatedMinutes", "difficulty"]
                     }
-                ];
-            } else if (fileName.includes('hist') || fileName.includes('social')) {
-                 subject = 'History';
-                 tasks = [
-                    { 
-                        id: `${planId}_t1`, 
-                        title: 'Era 1: Industrial Revolution', 
-                        isCompleted: false, 
-                        estimatedMinutes: 60, 
-                        difficulty: 'easy', 
-                        subjectWeightage: 20, 
-                        dueDate: addMinutes(now, 24 * 60 * 2).toISOString() 
-                    },
-                    { 
-                        id: `${planId}_t2`, 
-                        title: 'Era 2: World War I Causes', 
-                        isCompleted: false, 
-                        estimatedMinutes: 90, 
-                        difficulty: 'medium', 
-                        subjectWeightage: 30, 
-                        dueDate: addMinutes(now, 24 * 60 * 5).toISOString() 
-                    },
-                    { 
-                        id: `${planId}_t3`, 
-                        title: 'Era 3: Cold War Politics', 
-                        isCompleted: false, 
-                        estimatedMinutes: 120, 
-                        difficulty: 'hard', 
-                        subjectWeightage: 50, 
-                        dueDate: addMinutes(now, 24 * 60 * 10).toISOString() 
-                    }
-                 ];
-            } else if (fileName.includes('chem')) {
-                subject = 'Chemistry';
-                tasks = [
-                    { id: `${planId}_t1`, title: 'Atomic Structure', isCompleted: false, estimatedMinutes: 60, difficulty: 'medium', subjectWeightage: 15, dueDate: addMinutes(now, 24 * 60 * 2).toISOString() },
-                    { id: `${planId}_t2`, title: 'Chemical Bonding', isCompleted: false, estimatedMinutes: 90, difficulty: 'hard', subjectWeightage: 20, dueDate: addMinutes(now, 24 * 60 * 5).toISOString() },
-                    { id: `${planId}_t3`, title: 'Stoichiometry', isCompleted: false, estimatedMinutes: 90, difficulty: 'medium', subjectWeightage: 15, dueDate: addMinutes(now, 24 * 60 * 8).toISOString() }
-                ];
-            } else {
-                subject = 'General Study';
-                tasks = [
-                    { 
-                        id: `${planId}_t1`, 
-                        title: 'Chapter 1: Introduction & Concepts', 
-                        isCompleted: false, 
-                        estimatedMinutes: 45, 
-                        difficulty: 'easy', 
-                        subjectWeightage: 10, 
-                        dueDate: addMinutes(now, 24 * 60 * 2).toISOString() 
-                    },
-                    { 
-                        id: `${planId}_t2`, 
-                        title: 'Chapter 2: Core Methodology', 
-                        isCompleted: false, 
-                        estimatedMinutes: 90, 
-                        difficulty: 'medium', 
-                        subjectWeightage: 30, 
-                        dueDate: addMinutes(now, 24 * 60 * 5).toISOString() 
-                    },
-                    { 
-                        id: `${planId}_t3`, 
-                        title: 'Chapter 3: Advanced Applications', 
-                        isCompleted: false, 
-                        estimatedMinutes: 120, 
-                        difficulty: 'hard', 
-                        subjectWeightage: 60, 
-                        dueDate: addMinutes(now, 24 * 60 * 9).toISOString() 
-                    }
-                ];
+                }
             }
+        });
 
-            const plan: StudyPlan = {
-                id: planId,
-                title: `Syllabus: ${file.name.replace(/\.[^/.]+$/, "")}`, // Remove extension
-                subject: subject,
-                startDate: now.toISOString().split('T')[0],
-                endDate: addMinutes(now, 24 * 60 * 30).toISOString().split('T')[0],
-                priority: 'high',
-                tasks: tasks
-            };
+        if (response.text) {
+            const rawNodes = JSON.parse(response.text) as any[];
+            return rawNodes.map((n: any, idx: number) => ({
+                ...n,
+                id: `node_${Date.now()}_${idx}`,
+                parentId: undefined // We let the roadmapGenerator handle hierarchy reconstruction based on order/level
+            }));
+        }
+        return [];
+    } catch (error) {
+        console.error("AI Parsing Error", error);
+        return [];
+    }
+};
 
-            resolve(plan);
-        }, 2000); // 2-second simulated delay
+// Legacy support if needed, but primary is parseContentToNodes
+export const parseSyllabus = async (file: File): Promise<any> => {
+   const text = await readFileAsText(file);
+   return {
+       id: `p_syllabus_${Date.now()}`,
+       title: file.name,
+       subject: 'General',
+       startDate: new Date().toISOString().split('T')[0],
+       endDate: addMinutes(new Date(), 30*24*60).toISOString().split('T')[0],
+       priority: 'high',
+       tasks: []
+   }
+}
+
+export const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsText(file);
     });
 };

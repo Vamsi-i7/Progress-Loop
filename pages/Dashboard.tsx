@@ -187,8 +187,9 @@ const Dashboard: React.FC = () => {
                         <TrendingUp size={20} className="text-slate-400"/>
                     </div>
                 </div>
-                <div className="h-64 w-full" style={{ minHeight: 200, minWidth: 300 }}>
-                    <ResponsiveContainer width="100%" height="100%">
+                {/* Fixed height container for Recharts */}
+                <div className="w-full" style={{ height: 250, minHeight: 250 }}>
+                    <ResponsiveContainer width="100%" height={250}>
                         <LineChart data={weeklyActivity} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                             <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />

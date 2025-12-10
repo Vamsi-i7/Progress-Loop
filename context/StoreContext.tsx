@@ -1,26 +1,21 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { AppState, Goal, StudyPlan, User, ThemeColor, Notification, Transaction, ScheduledBlock, RiskReport, AIMetrics, PeerGroup, ChatMessage, SmartTemplate } from '../types';
+import { AppState, Goal, StudyPlan, User, ThemeColor, Notification, Transaction, ScheduledBlock, RiskReport, AIMetrics, PeerGroup, ChatMessage, SmartTemplate, Roadmap, Flashcard, Node, HistoryItem } from '../types';
 import { MockBackend } from '../services/MockBackend';
 import { getMentorResponse } from '../services/mentor';
-import { parseSyllabus } from '../services/syllabusParser';
+import { parseSyllabus, parseContentToNodes, readFileAsText } from '../services/syllabusParser';
+import { generateRoadmap } from '../services/roadmapGenerator';
+import { generateEmbeddings } from '../services/embeddings';
+import { queryMentor } from '../services/mentorRAG';
+import { generateTimetable } from '../services/timetableGenerator';
+import { generateFlashcards } from '../services/flashcardGenerator';
+import { generateSummaries } from '../services/summarizer';
 
 const populateDemoData = () => {
     MockBackend.resetUser(false);
     MockBackend.updateUser({
         name: 'Alex Chen', username: 'alexc_demo', email: 'alex@demo.com',
         plan: 'pro', level: 12, xp: 3450, maxXp: 5000, hearts: 5, streak: 42
-    });
-    MockBackend.addGoal({
-        id: 'dg1', title: 'Full Stack Development', type: 'daily', category: 'long-term', progress: 66,
-        habits: [
-            { id: 'dh1', title: 'Code for 1 hour', completed: true, streak: 42 },
-            { id: 'dh2', title: 'Read tech docs', completed: false, streak: 15 },
-            { id: 'dh3', title: 'Commit to GitHub', completed: true, streak: 42 }
-        ]
-    });
-    MockBackend.addTransaction({
-        id: 'txn_demo_1', date: '2023-10-01', amount: 1999, currency: 'INR', plan: 'pro', status: 'success'
     });
 };
 
@@ -52,6 +47,21 @@ interface StoreContextType extends AppState {
   sendChatMessage: (text: string) => void;
   handleSyllabusUpload: (file: File) => Promise<void>;
   applySmartTemplate: (templateId: string) => void;
+  // Study Assistant Actions
+  roadmaps: Roadmap[];
+  flashcards: Flashcard[];
+  isUploadModalOpen: boolean;
+  openUploadModal: () => void;
+  closeUploadModal: () => void;
+  uploadNotes: (file: File) => Promise<void>;
+  generateRoadmapTimetable: (roadmapId: string) => void;
+  createNodeFlashcards: (node: Node) => Promise<void>;
+  createNodeSummary: (node: Node) => Promise<void>;
+  // History Actions
+  history: HistoryItem[];
+  loadHistoryItem: (id: string) => void;
+  deleteHistoryItem: (id: string) => void;
+  clearHistory: () => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -82,6 +92,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [smartTemplates, setSmartTemplates] = useState<SmartTemplate[]>([]);
 
+  // Study Assistant State
+  const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [isUploadModalOpen, setUploadModalOpen] = useState(false);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+
   const refreshData = () => {
       setUser(MockBackend.getUser());
       setGoals([...MockBackend.getGoals()]);
@@ -90,17 +106,18 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setActivityLogs(MockBackend.getActivityMap());
       setRecentTransactions([...MockBackend.getTransactions()]);
       
-      // Refresh AI Data if enabled
       if (enableAIPlanner) {
           setScheduledBlocks([...MockBackend.getScheduledBlocks()]);
           setRiskReports({...MockBackend.getRiskReports()});
           setAiMetrics({...MockBackend.getAIMetrics()});
       }
-      // Refresh Advanced AI Data
       if (enableAdvancedAI) {
           setPeerGroups([...MockBackend.getPeerGroups()]);
           setChatHistory([...MockBackend.getChatHistory()]);
           setSmartTemplates([...MockBackend.getSmartTemplates()]);
+          setRoadmaps([...MockBackend.getRoadmaps()]);
+          setFlashcards([...MockBackend.getFlashcards()]);
+          setHistory([...MockBackend.getHistory()]);
       }
   };
 
@@ -114,7 +131,12 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     else document.documentElement.classList.remove('dark');
   }, [theme]);
 
-  // AI Feature Toggle
+  useEffect(() => {
+      // Initial load
+      refreshData();
+  }, []);
+
+  // Actions
   const toggleAIPlanner = () => {
       const newState = !enableAIPlanner;
       setEnableAIPlanner(newState);
@@ -129,34 +151,41 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       if (newState) refreshData();
   };
 
-  const runAIDemo = async () => {
-      MockBackend.runDemoScenario();
-      refreshData();
-  };
-
-  const applyAIReschedule = () => {
-      MockBackend.applyAutoReschedule();
-      refreshData();
-  };
-
+  const runAIDemo = async () => { MockBackend.runDemoScenario(); refreshData(); };
+  const applyAIReschedule = () => { MockBackend.applyAutoReschedule(); refreshData(); };
+  
   const toggleSurvivalMode = () => {
       const newUser = MockBackend.updateUser({ survivalMode: !user.survivalMode });
       setUser(newUser);
-      // Re-run scheduler with/without compression
       MockBackend.runScheduler();
       refreshData();
   };
 
-  const sendChatMessage = (text: string) => {
+  const sendChatMessage = async (text: string) => {
       const userMsg: ChatMessage = { id: `u_${Date.now()}`, sender: 'user', text, timestamp: new Date().toISOString() };
       MockBackend.addChatMessage(userMsg);
       setChatHistory([...MockBackend.getChatHistory()]);
 
-      setTimeout(() => {
-          const aiMsg = getMentorResponse(user, plans, scheduledBlocks, text);
+      const roadmaps = MockBackend.getRoadmaps();
+      if (roadmaps.length > 0) {
+          const embeddings = MockBackend.getEmbeddings();
+          const { answer, sources } = await queryMentor(text, embeddings);
+          const aiMsg: ChatMessage = { 
+              id: `ai_${Date.now()}`, 
+              sender: 'ai', 
+              text: answer, 
+              timestamp: new Date().toISOString(),
+              sources
+          };
           MockBackend.addChatMessage(aiMsg);
-          refreshData();
-      }, 1000);
+      } else {
+          setTimeout(() => {
+              const aiMsg = getMentorResponse(user, plans, scheduledBlocks, text);
+              MockBackend.addChatMessage(aiMsg);
+              refreshData();
+          }, 1000);
+      }
+      refreshData();
   };
 
   const handleSyllabusUpload = async (file: File) => {
@@ -166,30 +195,103 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   };
 
   const applySmartTemplate = (templateId: string) => {
-      const t = smartTemplates.find(temp => temp.id === templateId);
-      if (t) {
-          const plan: StudyPlan = {
-              id: `p_${Date.now()}`,
-              title: `${t.name} Plan`,
-              subject: 'Mixed',
-              startDate: new Date().toISOString().split('T')[0],
-              endDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
-              priority: 'high',
-              tasks: t.subjects.map((sub, i) => ({
-                  id: `t_${Date.now()}_${i}`,
-                  title: `Study ${sub}`,
-                  isCompleted: false,
-                  estimatedMinutes: 60,
-                  dueDate: new Date(Date.now() + (i+1)*24*60*60*1000).toISOString(),
-                  difficulty: 'medium',
-                  subjectWeightage: 20
-              }))
-          };
-          MockBackend.addPlan(plan);
+      refreshData();
+  };
+
+  // --- STUDY ASSISTANT ACTIONS ---
+
+  const openUploadModal = () => setUploadModalOpen(true);
+  const closeUploadModal = () => setUploadModalOpen(false);
+
+  const uploadNotes = async (file: File) => {
+      const text = await readFileAsText(file);
+      
+      // 1. Parse into nodes
+      const nodes = await parseContentToNodes(text, file.name);
+      
+      // 2. Generate Roadmap
+      const roadmap = generateRoadmap(file.name, nodes);
+      MockBackend.addRoadmap(roadmap);
+
+      // 3. Generate Embeddings (Background)
+      const embeddings = await generateEmbeddings(nodes);
+      MockBackend.addEmbeddings(embeddings);
+      
+      // 4. Save to History
+      const historyItem: HistoryItem = {
+          id: `hist_${Date.now()}`,
+          roadmapId: roadmap.id,
+          title: roadmap.title,
+          uploadedAt: new Date().toISOString(),
+          nodes: roadmap.nodes,
+          flashcards: [],
+          embeddings: embeddings
+      };
+      MockBackend.addHistory(historyItem);
+
+      MockBackend.addNotification({id: `n_emb_${Date.now()}`, title: 'AI Ready', message: 'You can now chat with your notes!', time: 'Just now', read: false, type: 'success'});
+      
+      refreshData();
+  };
+
+  const generateRoadmapTimetable = (roadmapId: string) => {
+      const roadmap = roadmaps.find(r => r.id === roadmapId);
+      if (roadmap) {
+          const timetable = generateTimetable(roadmap.nodes, []); 
+          MockBackend.addScheduledBlocks(timetable);
           refreshData();
       }
   };
 
+  const createNodeFlashcards = async (node: Node) => {
+      const cards = await generateFlashcards(node);
+      MockBackend.addFlashcards(cards);
+      
+      // Update history if active
+      if (roadmaps.length > 0) {
+          const activeHistory = MockBackend.getHistory().find(h => h.roadmapId === roadmaps[0].id);
+          if (activeHistory) {
+               const currentCards = activeHistory.flashcards || [];
+               activeHistory.flashcards = [...currentCards, ...cards];
+               MockBackend.save();
+          }
+      }
+      refreshData();
+  };
+
+  const createNodeSummary = async (node: Node) => {
+      const { overview, detailed } = await generateSummaries(node);
+      MockBackend.updateNodeSummary(roadmaps[0]?.id, node.id, overview, detailed);
+      refreshData();
+  };
+
+  const loadHistoryItem = (id: string) => {
+      const item = history.find(h => h.id === id);
+      if (item) {
+          const roadmap: Roadmap = {
+              id: item.roadmapId,
+              title: item.title,
+              nodes: item.nodes,
+              generatedAt: item.uploadedAt
+          };
+          MockBackend.setRoadmaps([roadmap]);
+          MockBackend.setFlashcards(item.flashcards || []);
+          MockBackend.setEmbeddings(item.embeddings || []);
+          refreshData();
+      }
+  };
+
+  const deleteHistoryItem = (id: string) => {
+      MockBackend.deleteHistory(id);
+      refreshData();
+  };
+
+  const clearHistory = () => {
+      MockBackend.clearHistory();
+      refreshData();
+  };
+
+  // (Standard Actions)
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
   const setThemeColor = (color: ThemeColor) => setThemeColorState(color);
   const toggleSidebar = () => setSidebarOpen(prev => !prev);
@@ -213,9 +315,6 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const togglePlanTask = (planId: string, taskId: string) => { MockBackend.togglePlanTask(planId, taskId); refreshData(); };
   const toggleHabit = (goalId: string, habitId: string) => {
       const result = MockBackend.toggleHabitCompletion(goalId, habitId);
-      if (result.completed && Math.random() > 0.8) {
-          MockBackend.addNotification({ id: `n${Date.now()}`, title: 'Great Job!', message: 'Keep the momentum going!', time: 'Just now', read: false, type: 'success' });
-      }
       refreshData();
   };
 
@@ -225,7 +324,11 @@ export const StoreProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       toggleTheme, setThemeColor, toggleSidebar, toggleHabit, addGoal, deleteGoal, 
       addPlan, togglePlanTask, login, logout, startDemo, upgradePlan, markNotificationsAsRead, refreshData, exportData,
       enableAIPlanner, toggleAIPlanner, scheduledBlocks, riskReports, runAIDemo, applyAIReschedule, aiMetrics,
-      enableAdvancedAI, toggleAdvancedAI, peerGroups, chatHistory, smartTemplates, toggleSurvivalMode, sendChatMessage, handleSyllabusUpload, applySmartTemplate
+      enableAdvancedAI, toggleAdvancedAI, peerGroups, chatHistory, smartTemplates, toggleSurvivalMode, sendChatMessage, handleSyllabusUpload, applySmartTemplate,
+      // Study Assistant
+      roadmaps, flashcards, uploadNotes, generateRoadmapTimetable, createNodeFlashcards, createNodeSummary,
+      isUploadModalOpen, openUploadModal, closeUploadModal,
+      history, loadHistoryItem, deleteHistoryItem, clearHistory
     }}>
       {children}
     </StoreContext.Provider>

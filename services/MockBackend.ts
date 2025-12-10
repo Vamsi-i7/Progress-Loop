@@ -1,10 +1,10 @@
 
-import { Goal, User, ActivityLog, StudyPlan, Notification, Transaction, ScheduledBlock, RiskReport, AIMetrics, BusySlot, PeerGroup, ChatMessage, SmartTemplate } from '../types';
+import { Goal, User, ActivityLog, StudyPlan, Notification, Transaction, ScheduledBlock, RiskReport, AIMetrics, BusySlot, PeerGroup, ChatMessage, SmartTemplate, Roadmap, Flashcard, EmbeddingEntry, HistoryItem } from '../types';
 import { scheduleTasks } from './scheduler';
 import { computeRiskMetrics, predictLearningOutcome } from './predictor';
 import { proposeReschedule } from './rescheduler';
 import { addMinutes } from '../utils/dateMath';
-import { generateRevisionTasks, calculateCognitiveLoad, compressTasks, prioritizeTasks, applyFocusMode } from './optimizer';
+import { calculateCognitiveLoad, compressTasks, prioritizeTasks, applyFocusMode } from './optimizer';
 import { COURSE_TEMPLATES } from './templates';
 
 // --- DATABASE SCHEMA SIMULATION ---
@@ -24,9 +24,14 @@ interface Database {
   peerGroups: PeerGroup[];
   chatHistory: ChatMessage[];
   smartTemplates: SmartTemplate[];
+  // Study Assistant Data
+  roadmaps: Roadmap[];
+  flashcards: Flashcard[];
+  embeddings: EmbeddingEntry[];
+  history: HistoryItem[];
 }
 
-const STORAGE_KEY = 'pl_backend_db_v4';
+const STORAGE_KEY = 'pl_backend_db_v8';
 
 const INITIAL_DB: Database = {
   user: {
@@ -69,9 +74,13 @@ const INITIAL_DB: Database = {
       }
   ],
   chatHistory: [
-      { id: 'm1', sender: 'ai', text: "Hi! I'm your AI Academic Mentor. I've analyzed your schedule and noticed you have a Physics exam coming up. Need any help planning?", timestamp: new Date().toISOString() }
+      { id: 'm1', sender: 'ai', text: "Hi! I'm your AI Academic Mentor. Upload your notes to get started!", timestamp: new Date().toISOString() }
   ],
-  smartTemplates: COURSE_TEMPLATES
+  smartTemplates: COURSE_TEMPLATES,
+  roadmaps: [],
+  flashcards: [],
+  embeddings: [],
+  history: []
 };
 
 class MockBackendService {
@@ -86,8 +95,7 @@ class MockBackendService {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
           const parsed = JSON.parse(stored);
-          if (!parsed.peerGroups) return { ...INITIAL_DB, ...parsed, peerGroups: INITIAL_DB.peerGroups, chatHistory: INITIAL_DB.chatHistory, smartTemplates: INITIAL_DB.smartTemplates };
-          return parsed;
+          return { ...INITIAL_DB, ...parsed };
       }
       return JSON.parse(JSON.stringify(INITIAL_DB));
     } catch (e) {
@@ -96,7 +104,7 @@ class MockBackendService {
     }
   }
 
-  private save() {
+  public save() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.db));
     } catch (e) {
@@ -224,15 +232,11 @@ class MockBackendService {
 
   getPlans() { return this.db.plans; }
   addPlan(plan: StudyPlan) { 
-      // Feature 1: Automatic Syllabus Ingestion (implicitly handled by UI calling this)
-      // Feature 5: Cross-Subject Priority
       plan.tasks = prioritizeTasks(plan.tasks, new Date());
-      // Feature 14: Survival Mode
       if (this.db.user.survivalMode) {
           plan.tasks = compressTasks(plan.tasks);
       }
       this.db.plans.push(plan); 
-      // Feature 4: Real-time Conflict Solver
       this.runScheduler();
       this.save(); 
   }
@@ -264,12 +268,79 @@ class MockBackendService {
   addChatMessage(msg: ChatMessage) { this.db.chatHistory.push(msg); this.save(); }
   getSmartTemplates() { return this.db.smartTemplates; }
 
+  // --- STUDY ASSISTANT METHODS ---
+  getRoadmaps() { return this.db.roadmaps; }
+  setRoadmaps(roadmaps: Roadmap[]) { this.db.roadmaps = roadmaps; this.save(); }
+  addRoadmap(roadmap: Roadmap) { 
+      this.db.roadmaps = [roadmap]; // Current implementation focuses on single active roadmap
+      this.save();
+      return roadmap;
+  }
+  
+  getFlashcards() { return this.db.flashcards; }
+  setFlashcards(cards: Flashcard[]) { this.db.flashcards = cards; this.save(); }
+  addFlashcards(cards: Flashcard[]) {
+      const existingIds = new Set(this.db.flashcards.map(f => f.id));
+      const newCards = cards.filter(c => !existingIds.has(c.id));
+      this.db.flashcards.push(...newCards);
+      this.save();
+  }
+  
+  getEmbeddings() { return this.db.embeddings; }
+  setEmbeddings(emb: EmbeddingEntry[]) { this.db.embeddings = emb; this.save(); }
+  addEmbeddings(embeddings: EmbeddingEntry[]) {
+      this.db.embeddings.push(...embeddings);
+      this.save();
+  }
+  
+  updateNodeSummary(roadmapId: string, nodeId: string, overview: string, detailed: string) {
+      const roadmap = this.db.roadmaps.find(r => r.id === roadmapId);
+      if (roadmap) {
+          const node = roadmap.nodes.find(n => n.id === nodeId);
+          if (node) {
+              node.summaryOverview = overview;
+              node.summaryDetailed = detailed;
+              this.save();
+              
+              // Update History if exists
+              const historyItem = this.db.history.find(h => h.roadmapId === roadmapId);
+              if (historyItem) {
+                  const hNode = historyItem.nodes.find(n => n.id === nodeId);
+                  if (hNode) {
+                      hNode.summaryOverview = overview;
+                      hNode.summaryDetailed = detailed;
+                      this.save();
+                  }
+              }
+          }
+      }
+  }
+  
+  addScheduledBlocks(blocks: ScheduledBlock[]) {
+      this.db.scheduledBlocks.push(...blocks);
+      this.save();
+  }
+
+  // --- HISTORY MANAGEMENT ---
+  getHistory(): HistoryItem[] { return this.db.history; }
+  addHistory(item: HistoryItem) {
+      this.db.history.unshift(item);
+      this.save();
+  }
+  deleteHistory(id: string) {
+      this.db.history = this.db.history.filter(h => h.id !== id);
+      this.save();
+  }
+  clearHistory() {
+      this.db.history = [];
+      this.save();
+  }
+
   // Internal Scheduler Runner
   runScheduler() {
       const now = new Date();
       const horizon = addMinutes(now, 7 * 24 * 60);
       
-      // Feature 8: Focus Mode (Apply chunks if needed)
       this.db.plans.forEach(p => {
           p.tasks = applyFocusMode(p.tasks);
       });
@@ -281,11 +352,9 @@ class MockBackendService {
       const report = computeRiskMetrics(this.db.user, allTasks, schedule, now);
       this.db.riskReports = report;
 
-      // Feature 3: Cognitive Load Detection
       const todaysBlocks = schedule.filter(b => b.assignedDay === now.toISOString().split('T')[0]);
       this.db.user.cognitiveLoadScore = calculateCognitiveLoad(allTasks, todaysBlocks);
       
-      // Feature 11: Intervention Alerts
       const highRisks = Object.values(report).filter(r => r.riskLevel === 'high');
       if (highRisks.length > 0) {
           const existingAlert = this.db.notifications.find(n => n.id.startsWith('alert_risk_'));
@@ -301,7 +370,6 @@ class MockBackendService {
           }
       }
 
-      // Feature 6: Learning Outcome Prediction
       const completedCount = allTasks.filter(t => t.isCompleted).length;
       const prediction = predictLearningOutcome(this.db.user, allTasks, completedCount);
       this.db.aiMetrics.predictedScore = prediction.score;
@@ -310,9 +378,7 @@ class MockBackendService {
       this.save();
   }
 
-  // Demo Runner: Populates data and runs the AI pipeline
   runDemoScenario() {
-      // 1. Clear existing plans and schedules
       this.db.plans = [];
       this.db.scheduledBlocks = [];
       this.db.busySlots = [];
@@ -322,39 +388,20 @@ class MockBackendService {
       const tomorrow = addMinutes(now, 24*60);
       const dayAfter = addMinutes(now, 48*60);
 
-      // 2. Add Busy Slots (Classes, Lunch, etc)
       this.db.busySlots = [
           { start: addMinutes(now, 60), end: addMinutes(now, 120), title: "Math Class" },
           { start: addMinutes(now, 240), end: addMinutes(now, 300), title: "Lunch" },
           { start: addMinutes(tomorrow, 60), end: addMinutes(tomorrow, 120), title: "Physics Class" },
       ];
 
-      // 3. Add Study Plans with Tasks
       this.db.plans.push({
           id: 'p1', title: 'Calculus Midterm', subject: 'Math', startDate: now.toISOString().split('T')[0], endDate: dayAfter.toISOString().split('T')[0], priority: 'high',
           tasks: [
-              { id: 't1', title: 'Review Limits', isCompleted: false, estimatedMinutes: 60, dueDate: addMinutes(now, 180).toISOString(), difficulty: 'medium', subjectWeightage: 30 }, // Tight deadline!
+              { id: 't1', title: 'Review Limits', isCompleted: false, estimatedMinutes: 60, dueDate: addMinutes(now, 180).toISOString(), difficulty: 'medium', subjectWeightage: 30 },
               { id: 't2', title: 'Practice Problems', isCompleted: false, estimatedMinutes: 90, dueDate: addMinutes(tomorrow, 300).toISOString(), difficulty: 'hard', subjectWeightage: 40 }
           ]
       });
-      this.db.plans.push({
-          id: 'p2', title: 'History Essay', subject: 'History', startDate: now.toISOString().split('T')[0], endDate: dayAfter.toISOString().split('T')[0], priority: 'medium',
-          tasks: [
-              { id: 't3', title: 'Research Topic', isCompleted: false, estimatedMinutes: 120, dueDate: addMinutes(dayAfter, 0).toISOString(), difficulty: 'easy', subjectWeightage: 20 }
-          ]
-      });
-
-      // 4. Run Scheduler & AI Pipeline
       this.runScheduler();
-
-      // 5. Generate Revisions (Feature 7)
-      const revisions = generateRevisionTasks(this.db.plans[0].tasks); 
-      if (revisions.length > 0) {
-          this.db.plans[0].tasks.push(...revisions);
-          this.runScheduler(); // Re-run with revisions
-      }
-
-      // 6. Calculate Metrics
       const report = this.db.riskReports;
       const highRisks = Object.values(report).filter(r => r.riskLevel === 'high').length;
       this.db.aiMetrics = {
@@ -368,17 +415,10 @@ class MockBackendService {
           predictedScore: 78,
           requiredEffortGap: 12
       };
-
       this.save();
-      
-      return {
-          schedule: this.db.scheduledBlocks,
-          report,
-          metrics: this.db.aiMetrics
-      };
+      return { schedule: this.db.scheduledBlocks, report, metrics: this.db.aiMetrics };
   }
 
-  // Auto-reschedule one high risk task for demo
   applyAutoReschedule() {
       const report = Object.values(this.db.riskReports).find(r => r.riskLevel === 'high' || r.riskLevel === 'medium');
       if (!report) return null;
@@ -397,18 +437,14 @@ class MockBackendService {
       );
 
       if (proposal) {
-          // Apply it
           if (proposal.originalSlot) {
                this.db.scheduledBlocks = this.db.scheduledBlocks.filter(b => b.id !== proposal.originalSlot!.id);
           }
           this.db.scheduledBlocks.push(proposal.proposedSlot);
           this.db.aiMetrics.reschedules += 1;
-          
-          // Re-run risk for this task (simple update)
           this.db.riskReports[task.id].riskLevel = 'low';
           this.db.riskReports[task.id].pMiss = 0.2;
           this.db.riskReports[task.id].reasons = ['Rescheduled to safe slot'];
-          
           this.save();
           return proposal;
       }

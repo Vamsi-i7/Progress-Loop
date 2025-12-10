@@ -3,12 +3,14 @@ import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
 import { 
   LayoutDashboard, Target, Calendar, TrendingUp, User, Settings, 
-  CreditCard, HelpCircle, MessageSquare, Info, Sparkles, Users
+  CreditCard, HelpCircle, MessageSquare, Info, Sparkles, Users,
+  BookOpen, BrainCircuit, Layers, Clock
 } from 'lucide-react';
 import { useStore, getColorClass } from '../../context/StoreContext';
+import UploadNotesModal from '../UploadNotesModal';
 
 const Sidebar: React.FC = () => {
-  const { sidebarOpen, user, themeColor, toggleSidebar, enableAdvancedAI } = useStore();
+  const { sidebarOpen, user, themeColor, toggleSidebar, enableAdvancedAI, isUploadModalOpen } = useStore();
 
   const navClass = ({ isActive }: { isActive: boolean }) => `
     flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 font-medium
@@ -20,6 +22,8 @@ const Sidebar: React.FC = () => {
 
   return (
     <>
+      {isUploadModalOpen && <UploadNotesModal />}
+      
       {/* Mobile Backdrop */}
       <div 
         className={`md:hidden fixed inset-0 bg-black/60 z-40 backdrop-blur-sm transition-opacity duration-300 ${
@@ -54,7 +58,17 @@ const Sidebar: React.FC = () => {
             <NavLink to="/goals" className={navClass}><Target size={20} /> Goals</NavLink>
             <NavLink to="/planner" className={navClass}><Calendar size={20} /> Planner</NavLink>
             <NavLink to="/progress" className={navClass}><TrendingUp size={20} /> Progress</NavLink>
-            {enableAdvancedAI && <NavLink to="/group" className={navClass}><Users size={20} /> Group Study</NavLink>}
+            
+            {enableAdvancedAI && (
+                <>
+                    <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-6">Study Assistant</p>
+                    <NavLink to="/roadmap" className={navClass}><BookOpen size={20} /> Roadmap</NavLink>
+                    <NavLink to="/flashcards" className={navClass}><Layers size={20} /> Flashcards</NavLink>
+                    <NavLink to="/mindmap" className={navClass}><BrainCircuit size={20} /> Mind Map</NavLink>
+                    <NavLink to="/history" className={navClass}><Clock size={20} /> History</NavLink>
+                    <NavLink to="/group" className={navClass}><Users size={20} /> Group Study</NavLink>
+                </>
+            )}
 
             <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-6">Account</p>
             <NavLink to="/profile" className={navClass}><User size={20} /> Profile</NavLink>

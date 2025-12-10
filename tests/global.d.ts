@@ -1,3 +1,6 @@
-declare function describe(name: string, fn: () => void): void;
-declare function it(name: string, fn: () => void): void;
+
+declare const describe: (name: string, fn: () => void) => void;
+declare const it: (name: string, fn: () => void) => void;
+declare const expect: any;
+
 export {};

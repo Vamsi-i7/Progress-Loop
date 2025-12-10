@@ -114,8 +114,9 @@ const Progress: React.FC = () => {
                 ))}
               </div>
             </div>
-            <div className="h-64 w-full" style={{ minHeight: 200, minWidth: 300 }}>
-              <ResponsiveContainer width="100%" height="100%">
+            {/* Fixed dimensions container */}
+            <div className="w-full" style={{ height: 250, minHeight: 250 }}>
+              <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={weeklyData}>
                   <defs>
                     <linearGradient id="colorSplit" x1="0" y1="0" x2="0" y2="1">
@@ -139,8 +140,9 @@ const Progress: React.FC = () => {
           {/* Bar Chart */}
           <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Daily Completion Rate (Est.)</h3>
-             <div className="h-64 w-full" style={{ minHeight: 200, minWidth: 300 }}>
-              <ResponsiveContainer width="100%" height="100%">
+             {/* Fixed dimensions container */}
+             <div className="w-full" style={{ height: 250, minHeight: 250 }}>
+              <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={completionData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />

@@ -107,6 +107,7 @@ export interface ScheduledBlock {
     start: Date;
     end: Date;
     assignedDay: string; // YYYY-MM-DD
+    nodeId?: string; // Added for Study Assistant
 }
 
 export interface RiskReport {
@@ -156,6 +157,9 @@ export interface AppState {
   peerGroups: PeerGroup[];
   chatHistory: ChatMessage[];
   smartTemplates: SmartTemplate[];
+  // Study Assistant
+  roadmaps: Roadmap[];
+  flashcards: Flashcard[];
 }
 
 // New Types for Upgrade
@@ -178,4 +182,56 @@ export interface ChatMessage {
   sender: 'user' | 'ai';
   text: string;
   timestamp: string; // ISO
+  sources?: string[]; // For RAG
 }
+
+// --- STUDY ASSISTANT MODULE TYPES ---
+
+export type Node = {
+  id: string;
+  title: string;
+  content: string;
+  parentId?: string;
+  level: number;
+  estimatedMinutes?: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  weight?: number;
+  summaryOverview?: string;
+  summaryDetailed?: string;
+};
+
+export type Roadmap = {
+  id: string;
+  title: string;
+  nodes: Node[];
+  generatedAt: string;
+  timetable?: ScheduledBlock[]; 
+};
+
+export type Flashcard = {
+  id: string;
+  question: string;
+  answer: string;
+  nodeId?: string;
+  tags?: string[];
+  type: 'concept' | 'definition' | 'reverse' | 'example' | 'cloze' | 'key_fact';
+};
+
+export type EmbeddingEntry = {
+  id: string;
+  nodeId: string;
+  vector: number[];
+  text: string;
+};
+
+export type HistoryItem = {
+  id: string;
+  roadmapId: string;
+  title: string;
+  uploadedAt: string;
+  nodes: Node[];
+  flashcards: Flashcard[];
+  embeddings: EmbeddingEntry[];
+  mindmap?: Node[];
+  summaries?: any;
+};
