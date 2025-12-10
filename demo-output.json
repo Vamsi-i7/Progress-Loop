@@ -1,0 +1,32 @@
+{
+  "schedule": [
+    {
+      "id": "blk_t1_1700000000000_0.123",
+      "taskId": "t1",
+      "planId": "p1",
+      "start": "2023-10-26T14:00:00.000Z",
+      "end": "2023-10-26T15:00:00.000Z",
+      "assignedDay": "2023-10-26"
+    }
+  ],
+  "report": {
+    "t1": {
+      "taskId": "t1",
+      "pMiss": 0.85,
+      "riskLevel": "high",
+      "reasons": [
+        "Tight deadline",
+        "Low activity streak"
+      ]
+    }
+  },
+  "metrics": {
+    "plannedTasks": 1,
+    "completedTasks": 0,
+    "totalSlippage": 2.5,
+    "reschedules": 0,
+    "predictedFailures": 1,
+    "predictedScore": 72,
+    "requiredEffortGap": 12
+  }
+}
