@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { StoreProvider, useStore } from './context/StoreContext';
@@ -20,6 +21,7 @@ import Roadmap from './pages/Roadmap';
 import Flashcards from './pages/Flashcards';
 import MindMap from './pages/MindMap';
 import History from './pages/History';
+import AIMentor from './pages/AIMentor';
 
 // Layout for Authenticated Users (Shows Sidebar)
 const AppLayout: React.FC = () => {
@@ -60,6 +62,7 @@ const App: React.FC = () => {
                 <Route path="/planner" element={<Planner />} />
                 <Route path="/progress" element={<Progress />} />
                 <Route path="/group" element={<GroupStudy />} />
+                <Route path="/ai-mentor" element={<AIMentor />} />
                 <Route path="/roadmap" element={<Roadmap />} />
                 <Route path="/flashcards" element={<Flashcards />} />
                 <Route path="/mindmap" element={<MindMap />} />

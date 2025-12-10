@@ -41,7 +41,7 @@ const ProtectedRoute = () => {
 };
 
 // Public Route Component
-const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+const PublicRoute = ({ children }: { children?: React.ReactNode }) => {
     const { isAuthenticated } = useStore();
     return isAuthenticated ? <Navigate to="/dashboard" replace /> : <>{children}</>;
 };
