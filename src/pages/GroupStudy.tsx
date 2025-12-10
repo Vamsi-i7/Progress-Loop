@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useStore, getColorClass } from '../context/StoreContext';
 import Header from '../components/Layout/Header';
 import { Users, Send, Plus, MoreVertical, MessageSquare, Bot, UserPlus, X, Paperclip, Clock, Share2 } from 'lucide-react';
@@ -26,6 +27,37 @@ const GroupStudy: React.FC = () => {
     const [isTyping, setIsTyping] = useState(false); // Mock typing
     const scrollRef = useRef<HTMLDivElement>(null);
 
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    // Handle Invite Link
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const inviteToken = params.get('invite');
+        if (inviteToken) {
+            try {
+                // Attempt to accept invite
+                MockBackend.acceptInvite(inviteToken);
+                refreshData(); // Refresh to see the new group
+                alert("Successfully joined the group!");
+                // Clear the invite param
+                navigate('/group', { replace: true });
+                
+                // Auto-select the joined group (heuristic: last one or find via backend if it returned ID)
+                // For now, refreshData happens async effectively in React state terms, 
+                // so we rely on the user seeing it in the list.
+            } catch (e: any) {
+                console.error("Join Error:", e);
+                // If error is "User already in group", that's fine, just navigate
+                if (e.message !== "Invite expired" && e.message !== "Invalid or expired invite") {
+                     navigate('/group', { replace: true });
+                } else {
+                    alert(e.message || "Failed to join group");
+                }
+            }
+        }
+    }, [location.search, navigate, refreshData]);
+
     // Auto-refresh logic for chat (polling mock)
     useEffect(() => {
         let unsubscribe: (() => void) | undefined;
@@ -45,11 +77,17 @@ const GroupStudy: React.FC = () => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [selectedGroup?.messages]);
+    }, [selectedGroup?.messages, isTyping]);
 
     const handleCreateSuccess = (groupId: string) => {
         const group = peerGroups.find(g => g.id === groupId);
-        if (group) setSelectedGroup(group);
+        // We need to fetch freshly because peerGroups prop might not be updated yet
+        // But since we called refreshData in Modal, it triggers re-render of this component
+        // Ideally we set it after a timeout or rely on finding it in the next render cycle.
+        // For mock, we can fetch directly.
+        const freshGroups = MockBackend.getGroups();
+        const newGroup = freshGroups.find(g => g.id === groupId);
+        if (newGroup) setSelectedGroup(newGroup);
     };
 
     const handleSendMessage = (e: React.FormEvent) => {
@@ -153,15 +191,15 @@ const GroupStudy: React.FC = () => {
                                 <ChatMessageItem key={msg.id} msg={msg} isMe={msg.senderId === user.id} />
                             ))}
                             {isTyping && (
-                                <div className="flex items-center gap-2 text-xs text-slate-400 ml-4">
-                                    <Bot size={14} /> AI is thinking <TypingIndicator />
+                                <div className="flex items-center gap-2 text-xs text-slate-400 ml-4 animate-pulse">
+                                    <Bot size={14} /> AI is thinking...
                                 </div>
                             )}
                         </div>
 
                         {/* Input Area */}
                         <form onSubmit={handleSendMessage} className="p-4 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-3 items-center">
-                            <button type="button" className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl" title="Attach File">
+                            <button type="button" onClick={() => setShowFilesPanel(true)} className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl" title="Attach File">
                                 <Paperclip size={20}/>
                             </button>
                             <div className="flex-1 relative">

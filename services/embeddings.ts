@@ -2,23 +2,24 @@
 import { GoogleGenAI } from "@google/genai";
 import { EmbeddingEntry, Node } from '../types';
 
+const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+const aiClient = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
 export const generateEmbeddings = async (nodes: Node[]): Promise<EmbeddingEntry[]> => {
+    if (!aiClient) return []; // Fallback empty if no key
+
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const entries: EmbeddingEntry[] = [];
 
-        // Sequential embedding to ensure reliability and avoid rate limits
         for (const node of nodes) {
             const textToEmbed = `${node.title}: ${node.content}`.substring(0, 2048); 
             
-            // Use 'contents' and pass the text in the correct format
-            const result = await ai.models.embedContent({
+            const result = await aiClient.models.embedContent({
                 model: "text-embedding-004",
                 contents: [{ parts: [{ text: textToEmbed }] }],
             });
 
-            // Use 'embeddings' (plural) from response
-            if (result.embeddings && result.embeddings[0] && result.embeddings[0].values) {
+            if (result.embeddings && result.embeddings.length > 0 && result.embeddings[0].values) {
                 entries.push({
                     id: `emb_${node.id}`,
                     nodeId: node.id,
@@ -43,13 +44,14 @@ const cosineSimilarity = (vecA: number[], vecB: number[]) => {
         normA += vecA[i] * vecA[i];
         normB += vecB[i] * vecB[i];
     }
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    return (normA > 0 && normB > 0) ? dotProduct / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
 };
 
 export const retrieveContext = async (query: string, embeddings: EmbeddingEntry[], topK: number = 5): Promise<EmbeddingEntry[]> => {
+    if (!aiClient || embeddings.length === 0) return [];
+
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const result = await ai.models.embedContent({
+        const result = await aiClient.models.embedContent({
             model: "text-embedding-004",
             contents: [{ parts: [{ text: query }] }],
         });
@@ -62,7 +64,7 @@ export const retrieveContext = async (query: string, embeddings: EmbeddingEntry[
             score: cosineSimilarity(queryVector, entry.vector)
         }));
 
-        scored.sort((a, b) => b.score - a.score);
+        scored.sort((a, b) => (b as any).score - (a as any).score);
         return scored.slice(0, topK);
 
     } catch (e) {

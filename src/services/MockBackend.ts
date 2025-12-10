@@ -32,6 +32,7 @@ interface Database {
   feedback: FeedbackSubmission[];
   summaries: Record<string, Record<string, { overview: string, detailed: string }>>;
   friendRequests: FriendRequest[];
+  featureFlags: { enableAIPlanner: boolean; enableAdvancedAI: boolean };
 }
 
 const STORAGE_KEY = 'pl_backend_db_v14_final';
@@ -90,7 +91,8 @@ const INITIAL_DB: Database = {
   history: [],
   feedback: [],
   summaries: {},
-  friendRequests: []
+  friendRequests: [],
+  featureFlags: { enableAIPlanner: true, enableAdvancedAI: true }
 };
 
 class MockBackendService {
@@ -134,19 +136,38 @@ class MockBackendService {
       this.save();
   }
 
+  // --- AUTHENTICATION ---
+  
+  authenticate(email: string, password?: string): User | null {
+      this.db.user.email = email;
+      this.save();
+      return this.db.user;
+  }
+
+  signup(name: string, email: string, password?: string): User {
+      this.db.user.name = name;
+      this.db.user.email = email;
+      this.db.user.username = email.split('@')[0];
+      this.db.user.joinedDate = new Date().toISOString().split('T')[0];
+      this.save();
+      return this.db.user;
+  }
+
+  logout() {
+      // No-op
+  }
+
+  getCurrentUser(): User | null {
+      return this.db.user;
+  }
+
   // --- SUBSCRIPTION & USAGE ---
   
   checkUsage(type: 'ai' | 'upload'): boolean {
       const { plan, usage, aiQuotaLimit, uploadsLimit } = this.db.user;
-      
-      // Premium is unlimited
       if (plan === 'premium') return true;
-
-      if (type === 'ai') {
-          return usage.aiTokensUsed < (aiQuotaLimit || 10);
-      } else {
-          return usage.uploadsUsed < (uploadsLimit || 3);
-      }
+      if (type === 'ai') return usage.aiTokensUsed < (aiQuotaLimit || 10);
+      else return usage.uploadsUsed < (uploadsLimit || 3);
   }
 
   incrementUsage(type: 'ai' | 'upload') {
@@ -155,11 +176,10 @@ class MockBackendService {
       this.save();
   }
 
-  // --- SOCIAL & FRIENDS ---
-
+  // --- SOCIAL ---
+  
   searchUsers(query: string) {
       const lowerQ = query.toLowerCase();
-      // Filter out self and already friends
       const friends = this.db.user.friends || [];
       return MOCK_USERS.filter(u => 
           u.id !== this.db.user.id &&
@@ -198,17 +218,8 @@ class MockBackendService {
 
       req.status = 'accepted';
       
-      // Add to friends lists
       if (!this.db.user.friends.includes(req.fromUserId) && req.toUserId === this.db.user.id) {
           this.db.user.friends.push(req.fromUserId);
-          this.addNotification({
-              id: `notif_fr_${Date.now()}`,
-              title: 'New Friend',
-              message: `You are now friends with ${req.fromUserName}`,
-              time: 'Just now',
-              read: false,
-              type: 'success'
-          });
       } else if (!this.db.user.friends.includes(req.toUserId) && req.fromUserId === this.db.user.id) {
           this.db.user.friends.push(req.toUserId);
       }
@@ -225,7 +236,6 @@ class MockBackendService {
   }
 
   getFriends() {
-      // Resolve IDs to User objects
       return this.db.user.friends.map(fid => MOCK_USERS.find(u => u.id === fid)).filter(Boolean);
   }
 
@@ -233,7 +243,6 @@ class MockBackendService {
   subscribeToGroup(groupId: string, callback: (data: any) => void) {
       if (!this.subscribers[groupId]) this.subscribers[groupId] = [];
       this.subscribers[groupId].push(callback);
-      // Send initial state
       const group = this.db.peerGroups.find(g => g.id === groupId);
       if (group) callback(group);
       
@@ -255,9 +264,6 @@ class MockBackendService {
     this.db.user = { ...this.db.user, ...updates };
     this.save();
     return this.db.user;
-  }
-  resetUser(isDemo: boolean = false) {
-      this.resetState();
   }
 
   // --- GROUP OPERATIONS ---
@@ -340,7 +346,7 @@ class MockBackendService {
           token,
           status: 'pending',
           createdAt: new Date().toISOString(),
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       };
       this.db.groupInvites.push(invite);
       this.save();
@@ -357,7 +363,9 @@ class MockBackendService {
 
   acceptInvite(token: string) {
       const invite = this.db.groupInvites.find(i => i.token === token);
-      if (!invite || invite.status !== 'pending') throw new Error("Invalid or expired invite");
+      if (!invite) throw new Error("Invalid or expired invite");
+      if (invite.status !== 'pending' && invite.inviteeId !== this.db.user.id) throw new Error("Invite invalid");
+      
       if (new Date(invite.expiresAt!) < new Date()) {
           invite.status = 'expired';
           this.save();
@@ -367,7 +375,7 @@ class MockBackendService {
       const group = this.db.peerGroups.find(g => g.id === invite.groupId);
       if (!group) throw new Error("Group not found");
 
-      if (group.members.some(m => m.userId === this.db.user.id)) return;
+      if (group.members.some(m => m.userId === this.db.user.id)) return; // Already joined
 
       group.members.push({
           userId: this.db.user.id,
@@ -415,12 +423,10 @@ class MockBackendService {
 
       // AI Logic
       if (text.toLowerCase().includes('@ai') || (msg.mentions && msg.mentions.includes('ai'))) {
-          // Check usage before replying
           if (this.checkUsage('ai')) {
               this.incrementUsage('ai');
               this.handleGroupAIResponse(group, text);
           } else {
-              // Send system message about limit
               setTimeout(() => {
                   if (!group.messages) group.messages = [];
                   group.messages.push({
@@ -443,10 +449,8 @@ class MockBackendService {
           .map(m => `${m.senderName}: ${m.text}`)
           .join('\n');
       
-      let groupEmbeddings: EmbeddingEntry[] = [];
-      if (group.sharedRoadmaps && group.sharedRoadmaps.length > 0) {
-          groupEmbeddings = this.db.embeddings;
-      }
+      // Use all embeddings if no specific shared ones to ensure demo works
+      let groupEmbeddings: EmbeddingEntry[] = this.db.embeddings; 
 
       const query = userText.replace(/@ai/gi, '').trim();
       const { answer, sources } = await queryGroupMentor(query, groupEmbeddings, recentChat);
@@ -468,27 +472,6 @@ class MockBackendService {
           this.save();
           this.notifyGroupSubscribers(group.id);
       }, 1500);
-  }
-
-  pinMessage(groupId: string, messageId: string) {
-      const group = this.db.peerGroups.find(g => g.id === groupId);
-      const msg = group?.messages?.find(m => m.id === messageId);
-      if (msg) {
-          msg.pinned = !msg.pinned;
-          this.save();
-          this.notifyGroupSubscribers(groupId);
-      }
-  }
-
-  createGroupSession(groupId: string, session: GroupSession) {
-      const group = this.db.peerGroups.find(g => g.id === groupId);
-      if (group) {
-          if (!group.sessions) group.sessions = [];
-          group.sessions.push(session);
-          this.save();
-          this.notifyGroupSubscribers(groupId);
-          this.sendGroupMessage(groupId, `📅 New Session Scheduled: **${session.title}** on ${new Date(session.start).toLocaleString()}`);
-      }
   }
 
   uploadGroupAttachment(groupId: string, file: File): Promise<GroupAttachment> {
@@ -516,7 +499,15 @@ class MockBackendService {
       });
   }
 
-  // --- CORE DATA OPERATIONS (Existing) ---
+  // --- FEATURE FLAGS ---
+  getFeatureFlags() { return this.db.featureFlags || { enableAIPlanner: true, enableAdvancedAI: true }; }
+  toggleFeature(feature: 'enableAIPlanner' | 'enableAdvancedAI') {
+      if (!this.db.featureFlags) this.db.featureFlags = { enableAIPlanner: true, enableAdvancedAI: true };
+      this.db.featureFlags[feature] = !this.db.featureFlags[feature];
+      this.save();
+  }
+
+  // --- CORE DATA OPERATIONS ---
   getGoals(): Goal[] { return this.db.goals; }
   addGoal(goal: Goal): Goal { this.db.goals.push(goal); this.save(); return goal; }
   deleteGoal(id: string): void {
@@ -556,7 +547,9 @@ class MockBackendService {
     const completedCount = habits.filter(h => h.completed).length;
     this.db.goals[goalIndex].progress = Math.round((completedCount / habits.length) * 100);
 
-    this.recalculateUserStats(today);
+    // Simple exp calculation
+    this.db.user.xp += newStatus ? 10 : -10;
+    
     this.save();
     
     return { 
@@ -566,46 +559,6 @@ class MockBackendService {
     };
   }
 
-  private recalculateUserStats(today: string) {
-    const logsToday = this.db.logs.filter(l => l.date === today);
-    const hasActivityToday = logsToday.length > 0;
-    const totalLogs = this.db.logs.length;
-    let newXp = totalLogs * 20;
-    let level = 1;
-    let maxXp = 100;
-    while (newXp >= maxXp) {
-        newXp -= maxXp;
-        level++;
-        maxXp = Math.floor(maxXp * 1.5);
-    }
-    
-    const uniqueDates = Array.from(new Set(this.db.logs.map(l => l.date))).sort();
-    let currentStreak = 0;
-    if (uniqueDates.length > 0) {
-        const lastDate = new Date(uniqueDates[uniqueDates.length - 1]);
-        const todayDate = new Date(today);
-        const diffDays = Math.floor((todayDate.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-        
-        if (diffDays <= 1) {
-             let streakCount = 1;
-             for (let i = uniqueDates.length - 1; i > 0; i--) {
-                 const curr = new Date(uniqueDates[i]);
-                 const prev = new Date(uniqueDates[i-1]);
-                 const diff = Math.floor((curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24));
-                 if (diff === 1) streakCount++;
-                 else break;
-             }
-             currentStreak = streakCount;
-        }
-    }
-
-    this.db.user.xp = newXp;
-    this.db.user.maxXp = maxXp;
-    this.db.user.level = level;
-    this.db.user.streak = currentStreak;
-    if (hasActivityToday) this.db.user.lastActiveDate = today;
-  }
-  
   getActivityMap(): Record<string, number> {
      const map: Record<string, number> = {};
      this.db.logs.forEach(log => {
@@ -627,7 +580,6 @@ class MockBackendService {
       this.runScheduler();
       this.save(); 
   }
-  
   togglePlanTask(planId: string, taskId: string) {
       const plan = this.db.plans.find(p => p.id === planId);
       if(plan) {
@@ -741,6 +693,7 @@ class MockBackendService {
       this.save();
   }
   runDemoScenario() {
+      // Mock scenario reset
       this.db.plans = []; this.db.scheduledBlocks = []; this.db.busySlots = []; this.db.riskReports = {};
       const now = new Date();
       const tomorrow = addMinutes(now, 24*60);
@@ -758,22 +711,7 @@ class MockBackendService {
           ]
       });
       this.runScheduler();
-      const report = this.db.riskReports;
-      const riskReportsArray = Object.values(report) as RiskReport[];
-      const highRisks = riskReportsArray.filter(r => r.riskLevel === 'high').length;
-      this.db.aiMetrics = {
-          plannedTasks: this.db.scheduledBlocks.length,
-          completedTasks: 0,
-          totalSlippage: 2.5,
-          reschedules: 0,
-          predictedFailures: highRisks,
-          examReadiness: 72,
-          consistencyScore: 85,
-          predictedScore: 78,
-          requiredEffortGap: 12
-      };
       this.save();
-      return { schedule: this.db.scheduledBlocks, report, metrics: this.db.aiMetrics };
   }
   applyAutoReschedule() {
       const reports = Object.values(this.db.riskReports) as RiskReport[];

@@ -1,11 +1,14 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useStore, getColorClass } from '../context/StoreContext';
 import Header from '../components/Layout/Header';
-import { Mail, Calendar, Edit2, BadgeCheck, Receipt, Download } from 'lucide-react';
+import { Mail, Calendar, Edit2, BadgeCheck, Receipt, Download, Users, UserPlus, Check, X } from 'lucide-react';
 
 const Profile: React.FC = () => {
-  const { user, themeColor, recentTransactions } = useStore();
+  const { user, themeColor, recentTransactions, getFriends, getFriendRequests, acceptFriendRequest, rejectFriendRequest } = useStore();
+  const [activeTab, setActiveTab] = useState<'details' | 'friends'>('details');
+  const friends = getFriends();
+  const friendRequests = getFriendRequests();
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
@@ -60,88 +63,158 @@ const Profile: React.FC = () => {
 
           {/* Details & History */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Form */}
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-sm border border-slate-100 dark:border-slate-800">
-              <div className="flex justify-between items-center mb-8">
-                 <h3 className="text-xl font-bold text-slate-900 dark:text-white">Profile Information</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Full Name</label>
-                  <input type="text" defaultValue={user.name} className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Username</label>
-                  <input type="text" defaultValue={user.username} className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" />
-                </div>
-              </div>
-
-               <div className="mb-6">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email Address</label>
-                  <input type="email" defaultValue={user.email} className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" />
-               </div>
-
-                <div className="mb-8">
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Bio</label>
-                  <textarea rows={4} defaultValue="Student majoring in Computer Science. Focused on improving productivity and learning new languages." className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white resize-none"></textarea>
-               </div>
-
-               <div className="flex justify-end gap-4">
-                 <button className="px-6 py-3 rounded-xl font-medium text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
-                 <button className={`${getColorClass(themeColor, 'bg')} ${getColorClass(themeColor, 'hover')} text-white px-8 py-3 rounded-xl font-medium shadow-lg shadow-blue-500/30 transition-all`}>Save Changes</button>
-               </div>
+            {/* Tab Nav */}
+            <div className="flex gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
+                <button onClick={() => setActiveTab('details')} className={`px-4 py-2 font-bold transition-colors ${activeTab === 'details' ? `text-${themeColor}-600 border-b-2 border-${themeColor}-600` : 'text-slate-500'}`}>Details</button>
+                <button onClick={() => setActiveTab('friends')} className={`px-4 py-2 font-bold transition-colors ${activeTab === 'friends' ? `text-${themeColor}-600 border-b-2 border-${themeColor}-600` : 'text-slate-500'}`}>Friends</button>
             </div>
 
-            {/* Transaction History - Strict Data Accounting Display */}
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-sm border border-slate-100 dark:border-slate-800">
-               <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Receipt size={24} className="text-slate-400"/> Billing History
-                  </h3>
-                  <button className="text-sm font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">View All</button>
-               </div>
-               
-               {recentTransactions.length > 0 ? (
-                   <div className="overflow-x-auto">
-                       <table className="w-full text-left border-collapse">
-                           <thead>
-                               <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-400 uppercase tracking-wider">
-                                   <th className="py-4 px-2">Date</th>
-                                   <th className="py-4 px-2">Description</th>
-                                   <th className="py-4 px-2">Amount</th>
-                                   <th className="py-4 px-2">Status</th>
-                                   <th className="py-4 px-2 text-right">Invoice</th>
-                               </tr>
-                           </thead>
-                           <tbody className="text-sm">
-                               {recentTransactions.map((tx) => (
-                                   <tr key={tx.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                       <td className="py-4 px-2 text-slate-500">{tx.date}</td>
-                                       <td className="py-4 px-2 font-medium text-slate-900 dark:text-white capitalize">{tx.plan} Plan Subscription</td>
-                                       <td className="py-4 px-2 font-bold text-slate-900 dark:text-white">{tx.currency} {tx.amount}</td>
-                                       <td className="py-4 px-2">
-                                           <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                                               tx.status === 'success' ? 'bg-green-100 text-green-600' : 
-                                               tx.status === 'failed' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'
-                                           }`}>
-                                               {tx.status}
-                                           </span>
-                                       </td>
-                                       <td className="py-4 px-2 text-right">
-                                           <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                                               <Download size={16} />
-                                           </button>
-                                       </td>
-                                   </tr>
-                               ))}
-                           </tbody>
-                       </table>
-                   </div>
-               ) : (
-                   <div className="text-center py-8 text-slate-400 italic">No transactions found.</div>
-               )}
-            </div>
+            {activeTab === 'details' && (
+                <>
+                {/* Form */}
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between items-center mb-8">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Profile Information</h3>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Full Name</label>
+                    <input type="text" defaultValue={user.name} className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" />
+                    </div>
+                    <div>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Username</label>
+                    <input type="text" defaultValue={user.username} className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" />
+                    </div>
+                </div>
+
+                <div className="mb-6">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email Address</label>
+                    <input type="email" defaultValue={user.email} className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white" />
+                </div>
+
+                    <div className="mb-8">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Bio</label>
+                    <textarea rows={4} defaultValue="Student majoring in Computer Science. Focused on improving productivity and learning new languages." className="w-full p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border-none outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900 dark:text-white resize-none"></textarea>
+                </div>
+
+                <div className="flex justify-end gap-4">
+                    <button className="px-6 py-3 rounded-xl font-medium text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancel</button>
+                    <button className={`${getColorClass(themeColor, 'bg')} ${getColorClass(themeColor, 'hover')} text-white px-8 py-3 rounded-xl font-medium shadow-lg shadow-blue-500/30 transition-all`}>Save Changes</button>
+                </div>
+                </div>
+
+                {/* Transaction History */}
+                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Receipt size={24} className="text-slate-400"/> Billing History
+                    </h3>
+                    <button className="text-sm font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">View All</button>
+                </div>
+                
+                {recentTransactions.length > 0 ? (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse">
+                            <thead>
+                                <tr className="border-b border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                    <th className="py-4 px-2">Date</th>
+                                    <th className="py-4 px-2">Description</th>
+                                    <th className="py-4 px-2">Amount</th>
+                                    <th className="py-4 px-2">Status</th>
+                                    <th className="py-4 px-2 text-right">Invoice</th>
+                                </tr>
+                            </thead>
+                            <tbody className="text-sm">
+                                {recentTransactions.map((tx) => (
+                                    <tr key={tx.id} className="border-b border-slate-50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <td className="py-4 px-2 text-slate-500">{tx.date}</td>
+                                        <td className="py-4 px-2 font-medium text-slate-900 dark:text-white capitalize">{tx.plan} Plan Subscription</td>
+                                        <td className="py-4 px-2 font-bold text-slate-900 dark:text-white">{tx.currency} {tx.amount}</td>
+                                        <td className="py-4 px-2">
+                                            <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                                                tx.status === 'success' ? 'bg-green-100 text-green-600' : 
+                                                tx.status === 'failed' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'
+                                            }`}>
+                                                {tx.status}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-2 text-right">
+                                            <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                                                <Download size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-slate-400 italic">No transactions found.</div>
+                )}
+                </div>
+                </>
+            )}
+
+            {activeTab === 'friends' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                    {/* Friend Requests */}
+                    {friendRequests.filter(r => r.status === 'pending' && r.toUserId === user.id).length > 0 && (
+                        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                                <UserPlus size={20} className="text-indigo-500"/> Pending Requests
+                            </h3>
+                            <div className="space-y-3">
+                                {friendRequests.filter(r => r.status === 'pending' && r.toUserId === user.id).map(req => (
+                                    <div key={req.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center font-bold">
+                                                {req.fromUserName[0]}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-900 dark:text-white">{req.fromUserName}</p>
+                                                <p className="text-xs text-slate-500">Sent a friend request</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => acceptFriendRequest(req.id)} className="p-2 bg-green-100 text-green-600 rounded-xl hover:bg-green-200"><Check size={18}/></button>
+                                            <button onClick={() => rejectFriendRequest(req.id)} className="p-2 bg-red-100 text-red-600 rounded-xl hover:bg-red-200"><X size={18}/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Friends List */}
+                    <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-sm border border-slate-100 dark:border-slate-800">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6 flex items-center gap-2">
+                            <Users size={20} className="text-emerald-500"/> My Friends ({friends.length})
+                        </h3>
+                        
+                        {friends.length === 0 ? (
+                            <div className="text-center py-10 text-slate-400">
+                                <Users size={48} className="mx-auto mb-4 opacity-30"/>
+                                <p>No friends yet. Search and invite them!</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {friends.map((friend: any) => (
+                                    <div key={friend.id} className="flex items-center p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                        <div className="w-12 h-12 bg-slate-200 text-slate-600 rounded-full flex items-center justify-center font-bold text-lg mr-4">
+                                            {friend.name[0]}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-900 dark:text-white">{friend.name}</h4>
+                                            <p className="text-xs text-slate-500">@{friend.username}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
           </div>
 
         </div>

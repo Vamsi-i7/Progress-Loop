@@ -1,16 +1,17 @@
 
 import React from 'react';
-import { NavLink, Link } from 'react-router-dom';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Target, Calendar, TrendingUp, User, Settings, 
   CreditCard, HelpCircle, MessageSquare, Info, Sparkles, Users,
-  BookOpen, BrainCircuit, Layers, Clock
+  BookOpen, BrainCircuit, Layers, Clock, Bot, LogOut
 } from 'lucide-react';
 import { useStore, getColorClass } from '../../context/StoreContext';
 import UploadNotesModal from '../UploadNotesModal';
 
 const Sidebar: React.FC = () => {
-  const { sidebarOpen, user, themeColor, toggleSidebar, enableAdvancedAI, isUploadModalOpen } = useStore();
+  const { sidebarOpen, user, themeColor, toggleSidebar, enableAdvancedAI, isUploadModalOpen, logout } = useStore();
+  const navigate = useNavigate();
 
   const navClass = ({ isActive }: { isActive: boolean }) => `
     flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 font-medium
@@ -19,6 +20,11 @@ const Sidebar: React.FC = () => {
       : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
     }
   `;
+
+  const handleLogout = () => {
+      logout();
+      navigate('/');
+  };
 
   return (
     <>
@@ -62,6 +68,7 @@ const Sidebar: React.FC = () => {
             {enableAdvancedAI && (
                 <>
                     <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-6">Study Assistant</p>
+                    <NavLink to="/ai-mentor" className={navClass}><Bot size={20} /> AI Mentor</NavLink>
                     <NavLink to="/roadmap" className={navClass}><BookOpen size={20} /> Roadmap</NavLink>
                     <NavLink to="/flashcards" className={navClass}><Layers size={20} /> Flashcards</NavLink>
                     <NavLink to="/mindmap" className={navClass}><BrainCircuit size={20} /> Mind Map</NavLink>
@@ -83,6 +90,10 @@ const Sidebar: React.FC = () => {
         </div>
 
         <div className="mt-auto p-6 border-t border-slate-100 dark:border-slate-800">
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 font-medium transition-colors mb-4">
+              <LogOut size={20} /> Log Out
+          </button>
+
           <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
             <div className={`w-10 h-10 rounded-full ${getColorClass(themeColor, 'bg')} flex items-center justify-center text-white text-sm font-bold`}>
               {user.name.substring(0, 2).toUpperCase()}

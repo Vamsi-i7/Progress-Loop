@@ -25,6 +25,14 @@ const Goals: React.FC = () => {
     }
   };
 
+  const handleDelete = (e: React.MouseEvent, id: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (window.confirm('Are you sure you want to delete this goal?')) {
+          deleteGoal(id);
+      }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
       <Header title="Your Goals" subtitle="Manage and track your long-term ambitions" />
@@ -83,12 +91,9 @@ const Goals: React.FC = () => {
                             </div>
                         </div>
                         <button 
-                           onClick={() => {
-                             if(window.confirm('Are you sure you want to delete this goal?')) {
-                               deleteGoal(goal.id);
-                             }
-                           }}
-                           className="p-2 text-slate-300 hover:text-red-500 transition-colors"
+                           onClick={(e) => handleDelete(e, goal.id)}
+                           className="p-2 text-slate-300 hover:text-red-500 transition-colors z-20 relative cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+                           title="Delete Goal"
                         >
                             <Trash2 size={20} />
                         </button>

@@ -6,6 +6,7 @@ export interface User {
   name: string;
   username: string;
   email: string;
+  password?: string; // In real app, never store plain text. Mock only.
   avatar?: string;
   plan: 'free' | 'pro' | 'premium';
   joinedDate: string;
@@ -15,10 +16,43 @@ export interface User {
   level: number;
   hearts: number;
   streak: number;
-  // Advanced AI Extensions
+  
+  // Feature flags & scores
   survivalMode?: boolean;
-  cognitiveLoadScore?: number; // 0-100
+  cognitiveLoadScore?: number;
   focusScore?: number;
+  
+  // Subscription limits
+  subscriptionStatus?: 'active' | 'canceled' | 'past_due';
+  subscriptionPeriodEnd?: number;
+  aiQuotaLimit?: number;
+  uploadsLimit?: number;
+  
+  // Usage tracking
+  usage: {
+      aiTokensUsed: number;
+      uploadsUsed: number;
+      flashcardsGenerated: number;
+      lastReset: string;
+  };
+
+  // Social
+  friends: string[]; // User IDs
+  friendRequests: string[]; // Request IDs
+}
+
+export interface AuthResponse {
+    user: User;
+    token: string;
+}
+
+export interface FriendRequest {
+    id: string;
+    fromUserId: string;
+    fromUserName: string;
+    toUserId: string;
+    status: 'pending' | 'accepted' | 'declined';
+    createdAt: string;
 }
 
 export interface Notification {
@@ -45,7 +79,7 @@ export interface Goal {
   title: string;
   type: GoalType;
   category: GoalCategory;
-  progress: number; // 0-100
+  progress: number;
   habits: Habit[];
   color?: string;
 }
@@ -54,11 +88,9 @@ export interface PlanTask {
   id: string;
   title: string;
   isCompleted: boolean;
-  // AI Extensions
   estimatedMinutes?: number;
-  dueDate?: string; // ISO Date Time
-  // Advanced AI Extensions
-  subjectWeightage?: number; // 0-100
+  dueDate?: string;
+  subjectWeightage?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
   isRevision?: boolean;
   actualTimeSpent?: number;
@@ -74,10 +106,9 @@ export interface StudyPlan {
   tasks: PlanTask[];
 }
 
-// Backend Specific Types
 export interface ActivityLog {
   id: string;
-  date: string; // ISO Date "YYYY-MM-DD"
+  date: string;
   goalId: string;
   habitId: string;
   timestamp: number;
@@ -93,81 +124,112 @@ export interface Transaction {
   invoiceUrl?: string;
 }
 
-// AI Planner Types
-export interface BusySlot {
-    start: Date;
-    end: Date;
-    title?: string;
-}
-
 export interface ScheduledBlock {
     id: string;
     taskId: string;
     planId: string;
     start: Date;
     end: Date;
-    assignedDay: string; // YYYY-MM-DD
-    nodeId?: string; // Added for Study Assistant
+    assignedDay: string;
+    nodeId?: string;
 }
 
 export interface RiskReport {
     taskId: string;
-    pMiss: number; // 0 to 1
+    pMiss: number;
     riskLevel: 'low' | 'medium' | 'high';
     reasons: string[];
-}
-
-export interface RescheduleProposal {
-    taskId: string;
-    originalSlot?: ScheduledBlock;
-    proposedSlot: ScheduledBlock;
-    reason: string;
 }
 
 export interface AIMetrics {
     plannedTasks: number;
     completedTasks: number;
-    totalSlippage: number; // hours
+    totalSlippage: number;
     reschedules: number;
     predictedFailures: number;
-    // Advanced Metrics
-    examReadiness?: number; // 0-100
-    consistencyScore?: number; // 0-100
-    predictedScore?: number; // 0-100 (Predicted Outcome)
-    requiredEffortGap?: number; // Hours needed to reach target
+    examReadiness?: number;
+    consistencyScore?: number;
+    predictedScore?: number;
+    requiredEffortGap?: number;
 }
 
-export interface AppState {
-  user: User;
-  goals: Goal[];
-  plans: StudyPlan[];
-  notifications: Notification[];
-  theme: 'light' | 'dark';
-  themeColor: ThemeColor;
-  sidebarOpen: boolean;
-  activityLogs: Record<string, number>; // Legacy map for quick lookup
-  recentTransactions: Transaction[];
-  // AI Feature Flags & Data
-  enableAIPlanner: boolean;
-  enableAdvancedAI: boolean; // New Master Flag for Features 1-15
-  scheduledBlocks: ScheduledBlock[];
-  riskReports: Record<string, RiskReport>;
-  aiMetrics: AIMetrics;
-  // Advanced AI Data
-  peerGroups: PeerGroup[];
-  chatHistory: ChatMessage[];
-  smartTemplates: SmartTemplate[];
-  // Study Assistant
-  roadmaps: Roadmap[];
-  flashcards: Flashcard[];
+export interface GroupMember {
+  userId: string;
+  role: 'owner' | 'admin' | 'member';
+  joinedAt: string;
+  name?: string; 
+  avatar?: string;
+  status?: 'online' | 'offline' | 'studying';
 }
 
-// New Types for Upgrade
+export interface GroupAttachment {
+    id: string;
+    name: string;
+    url: string;
+    type: string;
+    size?: number;
+    uploadedBy: string;
+    uploadedAt: string;
+}
+
+export interface GroupMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  senderName?: string;
+  text?: string;
+  attachments?: GroupAttachment[];
+  mentions?: string[];
+  timestamp: string;
+  edited?: boolean;
+  readBy?: string[];
+  pinned?: boolean;
+  isAi?: boolean;
+}
+
 export interface PeerGroup {
   id: string;
   name: string;
-  members: { name: string; avatar: string; status: string }[];
-  sharedPlans: string[];
+  description?: string;
+  creatorId: string;
+  members: GroupMember[];
+  createdAt: string;
+  settings: { allowInvites: boolean; requireApproval: boolean };
+  messages?: GroupMessage[]; 
+  attachments?: GroupAttachment[];
+  sessions?: GroupSession[];
+  sharedRoadmaps?: string[]; // IDs of roadmaps
+  sharedPlans?: string[];
+}
+
+export interface GroupInvite {
+  id: string;
+  groupId: string;
+  inviterId: string;
+  inviteeEmail?: string;
+  inviteeId?: string;
+  token: string;
+  status: 'pending' | 'accepted' | 'declined' | 'expired';
+  createdAt: string;
+  expiresAt?: string;
+}
+
+export interface GroupSession {
+  id: string;
+  groupId: string;
+  title: string;
+  start: string;
+  end?: string;
+  hostId: string;
+  notes?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: 'user' | 'ai';
+  text: string;
+  timestamp: string; 
+  sources?: string[];
 }
 
 export interface SmartTemplate {
@@ -176,16 +238,6 @@ export interface SmartTemplate {
   description: string;
   subjects: string[];
 }
-
-export interface ChatMessage {
-  id: string;
-  sender: 'user' | 'ai';
-  text: string;
-  timestamp: string; // ISO
-  sources?: string[]; // For RAG
-}
-
-// --- STUDY ASSISTANT MODULE TYPES ---
 
 export type Node = {
   id: string;
@@ -222,6 +274,8 @@ export type EmbeddingEntry = {
   nodeId: string;
   vector: number[];
   text: string;
+  groupId?: string;
+  type?: 'node' | 'message' | 'file';
 };
 
 export type HistoryItem = {
@@ -233,5 +287,49 @@ export type HistoryItem = {
   flashcards: Flashcard[];
   embeddings: EmbeddingEntry[];
   mindmap?: Node[];
-  summaries?: any;
+  summaries?: Record<string, { overview: string; detailed: string }>;
 };
+
+export interface FeedbackSubmission {
+  id: string;
+  userId: string;
+  page?: string;
+  message: string;
+  rating?: number;
+  createdAt: string;
+}
+
+export interface AppState {
+  user: User;
+  goals: Goal[];
+  plans: StudyPlan[];
+  notifications: Notification[];
+  theme: 'light' | 'dark';
+  themeColor: ThemeColor;
+  sidebarOpen: boolean;
+  activityLogs: Record<string, number>;
+  recentTransactions: Transaction[];
+  enableAIPlanner: boolean;
+  enableAdvancedAI: boolean;
+  scheduledBlocks: ScheduledBlock[];
+  riskReports: Record<string, RiskReport>;
+  aiMetrics: AIMetrics;
+  peerGroups: PeerGroup[];
+  chatHistory: ChatMessage[];
+  smartTemplates: SmartTemplate[];
+  roadmaps: Roadmap[];
+  flashcards: Flashcard[];
+}
+
+export interface BusySlot {
+    start: Date;
+    end: Date;
+    title?: string;
+}
+
+export interface RescheduleProposal {
+    taskId: string;
+    originalSlot?: ScheduledBlock;
+    proposedSlot: ScheduledBlock;
+    reason: string;
+}

@@ -1,87 +1,222 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore, getColorClass } from '../context/StoreContext';
 import Header from '../components/Layout/Header';
-import { Users, Share2, Clock, CheckCircle2, MoreHorizontal } from 'lucide-react';
+import { Users, Send, Plus, MoreVertical, MessageSquare, Bot, UserPlus, X, Paperclip, Clock, Share2 } from 'lucide-react';
+import { MockBackend } from '../services/MockBackend';
+import { PeerGroup } from '../types';
+import ChatMessageItem from '../components/ChatMessage';
+import GroupCreateModal from '../components/GroupCreateModal';
+import InviteModal from '../components/InviteModal';
+import GroupMembersPanel from '../components/GroupMembersPanel';
+import GroupFilesPanel from '../components/GroupFilesPanel';
+import TypingIndicator from '../components/GroupStudy/TypingIndicator';
 
 const GroupStudy: React.FC = () => {
-    const { peerGroups, themeColor } = useStore();
+    const { peerGroups, themeColor, user, refreshData } = useStore();
+    const [selectedGroup, setSelectedGroup] = useState<PeerGroup | null>(null);
+    const [message, setMessage] = useState('');
+    
+    // Modals & Panels State
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [showInviteModal, setShowInviteModal] = useState(false);
+    const [showMembersPanel, setShowMembersPanel] = useState(false);
+    const [showFilesPanel, setShowFilesPanel] = useState(false);
+    
+    const [isTyping, setIsTyping] = useState(false); // Mock typing
+    const scrollRef = useRef<HTMLDivElement>(null);
+
+    // Auto-refresh logic for chat (polling mock)
+    useEffect(() => {
+        let unsubscribe: (() => void) | undefined;
+        
+        if (selectedGroup) {
+            unsubscribe = MockBackend.subscribeToGroup(selectedGroup.id, (updatedGroup) => {
+                setSelectedGroup(updatedGroup);
+            });
+        }
+
+        return () => {
+            if (unsubscribe) unsubscribe();
+        };
+    }, [selectedGroup?.id]);
+
+    useEffect(() => {
+        if (scrollRef.current) {
+            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
+    }, [selectedGroup?.messages]);
+
+    const handleCreateSuccess = (groupId: string) => {
+        const group = peerGroups.find(g => g.id === groupId);
+        if (group) setSelectedGroup(group);
+    };
+
+    const handleSendMessage = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!message.trim() || !selectedGroup) return;
+        
+        MockBackend.sendGroupMessage(selectedGroup.id, message);
+        setMessage('');
+        
+        // Mock AI typing if mentioned
+        if (message.toLowerCase().includes('@ai')) {
+            setIsTyping(true);
+            setTimeout(() => setIsTyping(false), 2000); // AI "types" for 2 sec
+        }
+    };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col h-screen">
             <Header title="Group Study" subtitle="Collaborate with peers" />
             
-            <main className="p-6 max-w-7xl mx-auto space-y-8">
-                {peerGroups.length === 0 ? (
-                    <div className="text-center py-20">
-                        <Users size={64} className="mx-auto text-slate-300 mb-4"/>
-                        <h3 className="text-xl font-bold text-slate-400">No Groups Yet</h3>
-                        <p className="text-slate-500">Create a group to start planning together.</p>
+            <div className="flex flex-1 overflow-hidden p-4 md:p-6 gap-6 max-w-7xl mx-auto w-full relative">
+                
+                {/* Sidebar: Group List */}
+                <div className={`w-full md:w-80 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col ${selectedGroup ? 'hidden md:flex' : 'flex'}`}>
+                    <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                        <h3 className="font-bold text-lg text-slate-900 dark:text-white">Your Groups</h3>
+                        <button onClick={() => setShowCreateModal(true)} className={`p-2 rounded-xl text-white shadow-lg ${getColorClass(themeColor, 'bg')} hover:opacity-90`}>
+                            <Plus size={20} />
+                        </button>
                     </div>
-                ) : (
-                    peerGroups.map(group => (
-                        <div key={group.id} className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 shadow-sm border border-slate-100 dark:border-slate-800">
-                            <div className="flex justify-between items-start mb-6">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-12 h-12 rounded-2xl ${getColorClass(themeColor, 'bg')} text-white flex items-center justify-center`}>
-                                        <Users size={24} />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">{group.name}</h3>
-                                        <p className="text-sm text-slate-500">{group.members.length} members • {group.sharedPlans.length} shared plans</p>
-                                    </div>
-                                </div>
-                                <button className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><MoreHorizontal size={20}/></button>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                        {peerGroups.length === 0 ? (
+                            <div className="text-center py-10 text-slate-400">
+                                <Users size={48} className="mx-auto mb-2 opacity-20"/>
+                                <p className="text-sm">No groups yet.</p>
+                                <button onClick={() => setShowCreateModal(true)} className={`text-sm font-bold mt-2 hover:underline ${getColorClass(themeColor, 'text')}`}>Create One</button>
                             </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Members Status */}
-                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4">
-                                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-4">Live Status</h4>
-                                    <div className="space-y-3">
-                                        {group.members.map((m, i) => (
-                                            <div key={i} className="flex items-center justify-between">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
-                                                        {m.name[0]}
-                                                    </div>
-                                                    <span className="font-medium text-slate-700 dark:text-slate-200">{m.name}</span>
-                                                </div>
-                                                <span className={`text-xs px-2 py-1 rounded-full font-bold ${
-                                                    m.status === 'online' ? 'bg-green-100 text-green-600' : 
-                                                    m.status === 'studying' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-200 text-slate-500'
-                                                }`}>
-                                                    {m.status}
-                                                </span>
-                                            </div>
-                                        ))}
+                        ) : (
+                            peerGroups.map(group => (
+                                <div 
+                                    key={group.id}
+                                    onClick={() => { setSelectedGroup(group); setShowMembersPanel(false); setShowFilesPanel(false); }}
+                                    className={`p-4 rounded-xl cursor-pointer transition-all border border-transparent ${selectedGroup?.id === group.id ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                                >
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h4 className="font-bold text-slate-900 dark:text-white truncate">{group.name}</h4>
+                                        <span className="text-[10px] text-slate-400">{group.members.length} peers</span>
                                     </div>
+                                    <p className="text-xs text-slate-500 truncate">{group.description || 'No description'}</p>
                                 </div>
+                            ))
+                        )}
+                    </div>
+                </div>
 
-                                {/* Shared Deadlines */}
-                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4">
-                                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-4">Upcoming Deadlines</h4>
-                                    <div className="space-y-3">
-                                        <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm">
-                                            <Clock size={16} className="text-amber-500" />
-                                            <span className="text-sm font-medium flex-1">Calculus Review</span>
-                                            <span className="text-xs font-bold text-slate-400">Tomorrow</span>
-                                        </div>
-                                         <div className="flex items-center gap-3 p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm">
-                                            <Clock size={16} className="text-amber-500" />
-                                            <span className="text-sm font-medium flex-1">Physics Lab</span>
-                                            <span className="text-xs font-bold text-slate-400">2 Days</span>
-                                        </div>
-                                    </div>
-                                    <button className="w-full mt-4 py-2 text-sm font-bold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center justify-center gap-2">
-                                        <Share2 size={16} /> Share New Plan
-                                    </button>
+                {/* Main Chat Area */}
+                {selectedGroup ? (
+                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col overflow-hidden relative">
+                        {/* Chat Header */}
+                        <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900 z-10">
+                            <div className="flex items-center gap-4 cursor-pointer" onClick={() => setShowMembersPanel(!showMembersPanel)}>
+                                <button onClick={(e) => { e.stopPropagation(); setSelectedGroup(null); }} className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                                    <X size={20} className="text-slate-500"/>
+                                </button>
+                                <div className={`w-12 h-12 rounded-2xl ${getColorClass(themeColor, 'bg')} flex items-center justify-center text-white`}>
+                                    <Users size={24} />
                                 </div>
+                                <div>
+                                    <h3 className="font-bold text-lg text-slate-900 dark:text-white leading-tight">{selectedGroup.name}</h3>
+                                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                                        {selectedGroup.members.length} members <span className="w-1 h-1 rounded-full bg-slate-300"></span> Tap for info
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setShowInviteModal(true)} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Invite">
+                                    <UserPlus size={20} />
+                                </button>
+                                <button onClick={() => setShowFilesPanel(!showFilesPanel)} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Files">
+                                    <Paperclip size={20} />
+                                </button>
                             </div>
                         </div>
-                    ))
+
+                        {/* Messages */}
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 bg-slate-50/50 dark:bg-slate-950/50" ref={scrollRef}>
+                            <div className="text-center py-6">
+                                <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-500">Group created {new Date(selectedGroup.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            
+                            {(!selectedGroup.messages || selectedGroup.messages.length === 0) && (
+                                <div className="text-center py-10 text-slate-400">
+                                    <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
+                                    <p>No messages yet. Start the conversation!</p>
+                                    <p className="text-xs mt-2">Tip: Tag @AI to ask for help.</p>
+                                </div>
+                            )}
+
+                            {selectedGroup.messages?.map((msg) => (
+                                <ChatMessageItem key={msg.id} msg={msg} isMe={msg.senderId === user.id} />
+                            ))}
+                            {isTyping && (
+                                <div className="flex items-center gap-2 text-xs text-slate-400 ml-4">
+                                    <Bot size={14} /> AI is thinking <TypingIndicator />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Input Area */}
+                        <form onSubmit={handleSendMessage} className="p-4 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-3 items-center">
+                            <button type="button" className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl" title="Attach File">
+                                <Paperclip size={20}/>
+                            </button>
+                            <div className="flex-1 relative">
+                                <input 
+                                    type="text" 
+                                    value={message}
+                                    onChange={(e) => setMessage(e.target.value)}
+                                    placeholder="Type a message... (Tag @AI for help)"
+                                    className="w-full bg-slate-100 dark:bg-slate-800 rounded-xl pl-4 pr-12 py-3.5 outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-900 dark:text-white"
+                                />
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-2 pointer-events-none">
+                                    <MessageSquare size={18} className="text-slate-400" />
+                                </div>
+                            </div>
+                            <button 
+                                type="submit" 
+                                disabled={!message.trim()}
+                                className={`p-3.5 rounded-xl text-white transition-all ${message.trim() ? `${getColorClass(themeColor, 'bg')} shadow-lg hover:scale-105` : 'bg-slate-300 dark:bg-slate-700 cursor-not-allowed'}`}
+                            >
+                                <Send size={20} />
+                            </button>
+                        </form>
+                    </div>
+                ) : (
+                    <div className="hidden md:flex flex-1 flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 rounded-[2rem] border border-dashed border-slate-200 dark:border-slate-800">
+                        <div className="text-center max-w-sm">
+                            <div className="w-20 h-20 bg-white dark:bg-slate-900 rounded-3xl shadow-sm flex items-center justify-center mx-auto mb-6">
+                                <Users size={32} className="text-indigo-300" />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Select a Group</h3>
+                            <p className="text-slate-500 mb-8">Choose a study group from the sidebar or create a new one to start collaborating.</p>
+                            <button onClick={() => setShowCreateModal(true)} className={`px-6 py-3 rounded-xl font-bold text-white shadow-lg ${getColorClass(themeColor, 'bg')}`}>
+                                Create New Group
+                            </button>
+                        </div>
+                    </div>
                 )}
-            </main>
+
+                {/* Right Panels */}
+                {selectedGroup && showMembersPanel && (
+                    <GroupMembersPanel group={selectedGroup} onClose={() => setShowMembersPanel(false)} />
+                )}
+                {selectedGroup && showFilesPanel && (
+                    <GroupFilesPanel group={selectedGroup} onClose={() => setShowFilesPanel(false)} />
+                )}
+
+            </div>
+
+            {/* Modals */}
+            {showCreateModal && (
+                <GroupCreateModal onClose={() => setShowCreateModal(false)} onSuccess={handleCreateSuccess} />
+            )}
+            {showInviteModal && selectedGroup && (
+                <InviteModal groupId={selectedGroup.id} onClose={() => setShowInviteModal(false)} />
+            )}
         </div>
     );
 };

@@ -2,13 +2,38 @@
 import React, { useState } from 'react';
 import { useStore, getColorClass } from '../context/StoreContext';
 import Header from '../components/Layout/Header';
-import { Plus, Calendar as CalIcon, Clock, CheckSquare, Square, Bot, Zap, Upload, ShieldAlert, LayoutTemplate } from 'lucide-react';
+import { Plus, Calendar as CalIcon, Clock, CheckSquare, Square, Bot, Zap, Upload, ShieldAlert, LayoutTemplate, X } from 'lucide-react';
 import SyllabusUploadModal from '../components/SyllabusUploadModal';
 
 const Planner: React.FC = () => {
-  const { plans, togglePlanTask, themeColor, enableAIPlanner, scheduledBlocks, enableAdvancedAI, toggleSurvivalMode, user, smartTemplates, applySmartTemplate } = useStore();
+  const { plans, togglePlanTask, themeColor, enableAIPlanner, scheduledBlocks, enableAdvancedAI, toggleSurvivalMode, user, smartTemplates, applySmartTemplate, addPlan } = useStore();
   const [showUpload, setShowUpload] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  
+  // Create Plan State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newPlanTitle, setNewPlanTitle] = useState('');
+  const [newPlanSubject, setNewPlanSubject] = useState('');
+
+  const handleCreatePlan = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!newPlanTitle || !newPlanSubject) return;
+      
+      addPlan({
+          id: `p_${Date.now()}`,
+          title: newPlanTitle,
+          subject: newPlanSubject,
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // +30 days
+          priority: 'medium',
+          tasks: [
+              { id: `t_${Date.now()}_1`, title: 'Week 1 Goals', isCompleted: false, estimatedMinutes: 60, dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() }
+          ]
+      });
+      setShowCreateModal(false);
+      setNewPlanTitle('');
+      setNewPlanSubject('');
+  };
 
   const getDaysRemaining = (endDate: string) => {
     const end = new Date(endDate);
@@ -62,7 +87,10 @@ const Planner: React.FC = () => {
               Active Study Plans
               {enableAIPlanner && <span className="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-600 font-bold border border-indigo-200">AI Active</span>}
           </h3>
-          <button className={`${getColorClass(themeColor, 'bg')} hover:opacity-90 text-white px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium transition-all shadow-lg shadow-${themeColor}-500/20`}>
+          <button 
+            onClick={() => setShowCreateModal(true)}
+            className={`${getColorClass(themeColor, 'bg')} hover:opacity-90 text-white px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-medium transition-all shadow-lg shadow-${themeColor}-500/20`}
+          >
             <Plus size={16} /> New Study Plan
           </button>
         </div>
@@ -175,6 +203,45 @@ const Planner: React.FC = () => {
       </main>
       
       {showUpload && <SyllabusUploadModal onClose={() => setShowUpload(false)} />}
+
+      {/* New Plan Modal */}
+      {showCreateModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
+              <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 p-8">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-white">New Study Plan</h3>
+                      <button onClick={() => setShowCreateModal(false)}><X size={20} className="text-slate-400" /></button>
+                  </div>
+                  <form onSubmit={handleCreatePlan} className="space-y-4">
+                      <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Plan Title</label>
+                          <input 
+                              type="text" 
+                              required 
+                              value={newPlanTitle} 
+                              onChange={e => setNewPlanTitle(e.target.value)} 
+                              className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/50 dark:text-white" 
+                              placeholder="e.g. Finals Prep" 
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Subject</label>
+                          <input 
+                              type="text" 
+                              required 
+                              value={newPlanSubject} 
+                              onChange={e => setNewPlanSubject(e.target.value)} 
+                              className="w-full p-3 rounded-xl bg-slate-100 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/50 dark:text-white" 
+                              placeholder="e.g. Mathematics" 
+                          />
+                      </div>
+                      <button type="submit" className={`w-full py-3 rounded-xl font-bold text-white mt-4 ${getColorClass(themeColor, 'bg')}`}>
+                          Create Plan
+                      </button>
+                  </form>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

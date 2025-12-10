@@ -3,7 +3,7 @@ import React from 'react';
 import { useStore, getColorClass } from '../context/StoreContext';
 import { ThemeColor } from '../types';
 import Header from '../components/Layout/Header';
-import { Palette, Moon, Globe, Bell, CreditCard, LogOut, Shield, Database, Download, Bot, Zap, BrainCircuit } from 'lucide-react'; 
+import { Palette, Moon, Database, CreditCard, LogOut, Shield, Bot, Zap, BrainCircuit, Download } from 'lucide-react'; 
 import { useNavigate } from 'react-router-dom'; 
 
 const Settings: React.FC = () => {
@@ -81,7 +81,7 @@ const Settings: React.FC = () => {
            <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                  <p className="text-sm font-medium text-slate-900 dark:text-white">Current Plan: <span className={`capitalize font-bold ${getColorClass(themeColor, 'text')}`}>{user.plan}</span></p>
-                 <p className="text-xs text-slate-500">Manage your billing and payment methods</p>
+                 <p className="text-xs text-slate-500">Usage: {user.usage.aiTokensUsed} AI calls, {user.usage.uploadsUsed} Uploads</p>
               </div>
               <button onClick={() => navigate('/subscription')} className="px-4 py-2 text-sm font-medium bg-slate-100 dark:bg-slate-800 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Manage Plan</button>
            </div>
