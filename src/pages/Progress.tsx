@@ -1,12 +1,12 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useStore, getColorClass } from '../context/StoreContext';
 import Header from '../components/Layout/Header';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar } from 'recharts';
-import { Flame, Trophy, TrendingUp, Target } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend } from 'recharts';
+import { Flame, Trophy, TrendingUp, Target, Clock } from 'lucide-react';
 
 const Progress: React.FC = () => {
-  const { themeColor, goals, activityLogs, user } = useStore();
+  const { themeColor, goals, activityLogs, user, plans } = useStore();
   
   // 1. Generate Real Weekly Data for Area Chart
   const getWeeklyData = () => {
@@ -30,11 +30,58 @@ const Progress: React.FC = () => {
   const weeklyData = getWeeklyData();
 
   // 2. Mock Completion Rate Data (Since we only have logs for counts, not rates, we'll map counts to a visual scale for now)
-  // In a real DB you would calculate percentage per day.
   const completionData = weeklyData.map(d => ({
       name: d.name,
       rate: Math.min(100, d.completed * 20) // Simulated: 5 tasks = 100%
   }));
+
+  // 3. Calculate Study Time Progress (Planned vs Completed Minutes)
+  const studyData = useMemo(() => {
+      const map: Record<string, { date: string; displayDate: string; planned: number; completed: number }> = {};
+      
+      // Initialize last 7 days
+      for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const dateKey = d.toISOString().split('T')[0];
+          const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          map[dateKey] = { 
+              date: dateKey, 
+              displayDate: days[d.getDay()], 
+              planned: 0, 
+              completed: 0 
+          };
+      }
+
+      plans.forEach(plan => {
+          plan.tasks.forEach(task => {
+              if (!task.dueDate) return;
+              const dateKey = task.dueDate.split('T')[0];
+              
+              if (!map[dateKey]) {
+                  const d = new Date(task.dueDate);
+                  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                  map[dateKey] = { 
+                      date: dateKey, 
+                      displayDate: days[d.getDay()] || dateKey.substring(5), 
+                      planned: 0, 
+                      completed: 0 
+                  };
+              }
+              
+              const mins = task.estimatedMinutes || 0;
+              map[dateKey].planned += mins;
+              if (task.isCompleted) {
+                  map[dateKey].completed += mins;
+              }
+          });
+      });
+
+      // Convert to array, sort by date, and take last 7 entries for cleaner view
+      return Object.values(map)
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(-7); 
+  }, [plans]);
 
   // Calculate Weekly Average
   const totalTasksLast7Days = weeklyData.reduce((acc, curr) => acc + curr.completed, 0);
@@ -104,7 +151,7 @@ const Progress: React.FC = () => {
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Line Chart */}
+          {/* Line Chart - Activity */}
           <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Weekly Activity</h3>
@@ -114,8 +161,7 @@ const Progress: React.FC = () => {
                 ))}
               </div>
             </div>
-            {/* Fixed dimensions container */}
-            <div className="w-full" style={{ height: 250, minHeight: 250, minWidth: 300 }}>
+            <div className="w-full" style={{ height: 250, minHeight: 250 }}>
               <ResponsiveContainer width="100%" height={250}>
                 <AreaChart data={weeklyData}>
                   <defs>
@@ -137,11 +183,10 @@ const Progress: React.FC = () => {
             </div>
           </div>
 
-          {/* Bar Chart */}
+          {/* Bar Chart - Completion Rate */}
           <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
             <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-6">Daily Completion Rate (Est.)</h3>
-             {/* Fixed dimensions container */}
-             <div className="w-full" style={{ height: 250, minHeight: 250, minWidth: 300 }}>
+             <div className="w-full" style={{ height: 250, minHeight: 250 }}>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={completionData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -156,6 +201,34 @@ const Progress: React.FC = () => {
               </ResponsiveContainer>
             </div>
           </div>
+        </div>
+
+        {/* Study Time Investment Chart */}
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <Clock size={20} className={getColorClass(themeColor, 'text')}/> Study Time Investment
+                    </h3>
+                    <p className="text-sm text-slate-500">Planned vs Actual study minutes over time.</p>
+                </div>
+            </div>
+            <div className="w-full" style={{ height: 300, minHeight: 300 }}>
+                <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={studyData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="displayDate" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} label={{ value: 'Minutes', angle: -90, position: 'insideLeft', fill: '#94a3b8' }} />
+                        <Tooltip 
+                            cursor={{fill: '#f8fafc'}}
+                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                        <Bar dataKey="planned" name="Planned Minutes" fill="#e2e8f0" radius={[4, 4, 0, 0]} barSize={20} />
+                        <Bar dataKey="completed" name="Completed Minutes" fill={chartColor} radius={[4, 4, 0, 0]} barSize={20} />
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
         </div>
 
       </main>

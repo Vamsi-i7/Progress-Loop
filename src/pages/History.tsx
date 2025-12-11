@@ -11,7 +11,7 @@ const History: React.FC = () => {
 
     const handleLoad = (id: string) => {
         loadHistoryItem(id);
-        navigate('/roadmap');
+        navigate('/study/roadmap');
     };
 
     return (

@@ -40,17 +40,13 @@ const GroupStudy: React.FC = () => {
                 MockBackend.acceptInvite(inviteToken);
                 refreshData(); // Refresh to see the new group
                 alert("Successfully joined the group!");
-                // Clear the invite param
-                navigate('/group', { replace: true });
-                
-                // Auto-select the joined group (heuristic: last one or find via backend if it returned ID)
-                // For now, refreshData happens async effectively in React state terms, 
-                // so we rely on the user seeing it in the list.
+                // Clear the invite param and ensure we stay in the correct nested route
+                navigate('/study/group', { replace: true });
             } catch (e: any) {
                 console.error("Join Error:", e);
                 // If error is "User already in group", that's fine, just navigate
                 if (e.message !== "Invite expired" && e.message !== "Invalid or expired invite") {
-                     navigate('/group', { replace: true });
+                     navigate('/study/group', { replace: true });
                 } else {
                     alert(e.message || "Failed to join group");
                 }
@@ -82,9 +78,6 @@ const GroupStudy: React.FC = () => {
     const handleCreateSuccess = (groupId: string) => {
         const group = peerGroups.find(g => g.id === groupId);
         // We need to fetch freshly because peerGroups prop might not be updated yet
-        // But since we called refreshData in Modal, it triggers re-render of this component
-        // Ideally we set it after a timeout or rely on finding it in the next render cycle.
-        // For mock, we can fetch directly.
         const freshGroups = MockBackend.getGroups();
         const newGroup = freshGroups.find(g => g.id === groupId);
         if (newGroup) setSelectedGroup(newGroup);

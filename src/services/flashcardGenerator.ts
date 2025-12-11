@@ -4,10 +4,14 @@ import { Node, Flashcard } from '../types';
 
 export const generateFlashcards = async (node: Node): Promise<Flashcard[]> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+        if (!apiKey) return [];
         
+        const ai = new GoogleGenAI({ apiKey });
+        
+        // Using Flash-Lite for speed
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-2.5-flash-lite',
             contents: `Generate exactly 6 study flashcards for the topic: "${node.title}".
             Content Context: ${node.content}
             

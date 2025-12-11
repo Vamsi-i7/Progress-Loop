@@ -246,6 +246,9 @@ export interface ChatMessage {
   text: string;
   timestamp: string; 
   sources?: string[];
+  imageUrl?: string;
+  audioUrl?: string; // For TTS or voice replies
+  isThinking?: boolean;
 }
 
 // --- STUDY ASSISTANT MODULE TYPES ---

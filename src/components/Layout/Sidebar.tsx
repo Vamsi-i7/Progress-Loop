@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Link, useNavigate } from 'react-router-dom';
 import { 
   LayoutDashboard, Target, Calendar, TrendingUp, User, Settings, 
   CreditCard, HelpCircle, MessageSquare, Info, Sparkles, Users,
-  BookOpen, BrainCircuit, Layers, Clock, Bot, LogOut
+  BookOpen, BrainCircuit, Layers, Clock, Bot, LogOut, Palette,
+  ChevronDown, ChevronRight
 } from 'lucide-react';
 import { useStore, getColorClass } from '../../context/StoreContext';
 import UploadNotesModal from '../UploadNotesModal';
@@ -12,6 +13,7 @@ import UploadNotesModal from '../UploadNotesModal';
 const Sidebar: React.FC = () => {
   const { sidebarOpen, user, themeColor, toggleSidebar, enableAdvancedAI, isUploadModalOpen, logout } = useStore();
   const navigate = useNavigate();
+  const [isStudyOpen, setIsStudyOpen] = useState(true);
 
   const navClass = ({ isActive }: { isActive: boolean }) => `
     flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 font-medium
@@ -66,15 +68,25 @@ const Sidebar: React.FC = () => {
             <NavLink to="/progress" className={navClass}><TrendingUp size={20} /> Progress</NavLink>
             
             {enableAdvancedAI && (
-                <>
-                    <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-6">Study Assistant</p>
-                    <NavLink to="/ai-mentor" className={navClass}><Bot size={20} /> AI Mentor</NavLink>
-                    <NavLink to="/roadmap" className={navClass}><BookOpen size={20} /> Roadmap</NavLink>
-                    <NavLink to="/flashcards" className={navClass}><Layers size={20} /> Flashcards</NavLink>
-                    <NavLink to="/mindmap" className={navClass}><BrainCircuit size={20} /> Mind Map</NavLink>
-                    <NavLink to="/history" className={navClass}><Clock size={20} /> History</NavLink>
-                    <NavLink to="/group" className={navClass}><Users size={20} /> Group Study</NavLink>
-                </>
+                <div className="mt-6">
+                    <button 
+                        onClick={() => setIsStudyOpen(!isStudyOpen)}
+                        className="w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                    >
+                        <span>Study Assistant</span>
+                        {isStudyOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </button>
+                    
+                    <div className={`space-y-1 transition-all duration-300 overflow-hidden ${isStudyOpen ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'}`}>
+                        <NavLink to="/study/mentor" className={navClass}><Bot size={20} /> AI Mentor</NavLink>
+                        <NavLink to="/study/studio" className={navClass}><Palette size={20} /> Studio</NavLink>
+                        <NavLink to="/study/roadmap" className={navClass}><BookOpen size={20} /> Roadmap</NavLink>
+                        <NavLink to="/study/flashcards" className={navClass}><Layers size={20} /> Flashcards</NavLink>
+                        <NavLink to="/study/mindmap" className={navClass}><BrainCircuit size={20} /> Mind Map</NavLink>
+                        <NavLink to="/study/history" className={navClass}><Clock size={20} /> History</NavLink>
+                        <NavLink to="/study/group" className={navClass}><Users size={20} /> Group Study</NavLink>
+                    </div>
+                </div>
             )}
 
             <p className="px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2 mt-6">Account</p>

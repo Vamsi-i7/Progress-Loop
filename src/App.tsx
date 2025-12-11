@@ -22,6 +22,7 @@ import Flashcards from './pages/Flashcards';
 import MindMap from './pages/MindMap';
 import History from './pages/History';
 import AIMentor from './pages/AIMentor';
+import ImageGen from './pages/ImageGen';
 
 // Layout for Authenticated Users (Shows Sidebar)
 const AppLayout: React.FC = () => {
@@ -61,12 +62,18 @@ const App: React.FC = () => {
                 <Route path="/goals" element={<Goals />} />
                 <Route path="/planner" element={<Planner />} />
                 <Route path="/progress" element={<Progress />} />
-                <Route path="/group" element={<GroupStudy />} />
-                <Route path="/ai-mentor" element={<AIMentor />} />
-                <Route path="/roadmap" element={<Roadmap />} />
-                <Route path="/flashcards" element={<Flashcards />} />
-                <Route path="/mindmap" element={<MindMap />} />
-                <Route path="/history" element={<History />} />
+                
+                {/* Nested Study Assistant Routes */}
+                <Route path="study">
+                    <Route path="mentor" element={<AIMentor />} />
+                    <Route path="studio" element={<ImageGen />} />
+                    <Route path="roadmap" element={<Roadmap />} />
+                    <Route path="flashcards" element={<Flashcards />} />
+                    <Route path="mindmap" element={<MindMap />} />
+                    <Route path="history" element={<History />} />
+                    <Route path="group" element={<GroupStudy />} />
+                </Route>
+
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/settings" element={<Settings />} />
                 <Route path="/subscription" element={<Subscription />} />

@@ -9,7 +9,8 @@ import ReactFlow, {
     Edge as RFEdge,
     Handle,
     Position,
-    BackgroundVariant
+    BackgroundVariant,
+    ReactFlowInstance
 } from 'reactflow';
 import { useStore, getColorClass } from '../context/StoreContext';
 import Header from '../components/Layout/Header';
@@ -19,6 +20,7 @@ import { Node as StudyNode } from '../types';
 
 // --- CUSTOM NODE COMPONENT ---
 const CustomMindMapNode = ({ data }: { data: any }) => {
+    // Difficulty color coding
     const difficultyColors = {
         easy: 'border-green-400 bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-300',
         medium: 'border-amber-400 bg-amber-50 dark:bg-amber-900/10 text-amber-700 dark:text-amber-300',
@@ -37,6 +39,7 @@ const CustomMindMapNode = ({ data }: { data: any }) => {
                 border-2 border-slate-100 dark:border-slate-800 
                 transition-all duration-300 overflow-hidden
             `}>
+                {/* Header Strip */}
                 <div className={`h-1.5 w-full ${diffClass.split(' ')[0].replace('border', 'bg')}`}></div>
                 
                 <div className="p-4">
@@ -50,6 +53,12 @@ const CustomMindMapNode = ({ data }: { data: any }) => {
                             {data.difficulty}
                         </div>
                     </div>
+
+                    {data.weight > 0 && (
+                        <div className="mt-2 w-full h-1 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-indigo-500 opacity-50" style={{ width: `${Math.min(100, data.weight)}%` }}></div>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -64,8 +73,10 @@ const MindMapContent: React.FC = () => {
     const [nodes, setNodes] = useState<RFNode[]>([]);
     const [edges, setEdges] = useState<RFEdge[]>([]);
 
+    // Register Custom Node Type
     const nodeTypes = useMemo(() => ({ custom: CustomMindMapNode }), []);
 
+    // Recalculate layout when roadmaps change
     useMemo(() => {
         if (roadmaps.length === 0) {
             setNodes([]);
@@ -76,20 +87,23 @@ const MindMapContent: React.FC = () => {
         const rNodes: RFNode[] = [];
         const rEdges: RFEdge[] = [];
         
+        // Improved Tree Layout
         const levelY: Record<number, number> = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        // Increase offsets for the custom node size
         const X_OFFSET = 350; 
         const Y_SPACING = 180;
 
         roadmaps[0].nodes.forEach((n: StudyNode) => {
             const level = n.level || 0;
             const x = level * X_OFFSET;
+            // Add some jitter to Y to make it look less robotic if multiple nodes share parent
             const y = (levelY[level] || 0) * Y_SPACING;
             
             levelY[level] = (levelY[level] || 0) + 1;
             
             rNodes.push({
                 id: n.id,
-                type: 'custom', 
+                type: 'custom', // Use our custom component
                 data: { 
                     label: n.title, 
                     difficulty: n.difficulty || 'medium',
@@ -104,7 +118,7 @@ const MindMapContent: React.FC = () => {
                     id: `e-${n.parentId}-${n.id}`,
                     source: n.parentId,
                     target: n.id,
-                    type: 'default', 
+                    type: 'default', // Bezier
                     style: { stroke: '#94a3b8', strokeWidth: 2, opacity: 0.5 },
                     animated: false
                 });
@@ -114,9 +128,15 @@ const MindMapContent: React.FC = () => {
         setNodes(rNodes);
         setEdges(rEdges);
         
-        setTimeout(() => fitView({ duration: 800, padding: 0.2 }), 100);
+    }, [roadmaps]);
 
-    }, [roadmaps, fitView]);
+    // Initialize with a fit view
+    const onInit = useCallback((instance: ReactFlowInstance) => {
+        // Adding a small delay ensures DOM is ready for calculations
+        setTimeout(() => {
+            instance.fitView({ padding: 0.2 });
+        }, 100);
+    }, []);
 
     const handleCenter = useCallback(() => {
         fitView({ duration: 800, padding: 0.2 });
@@ -124,6 +144,7 @@ const MindMapContent: React.FC = () => {
 
     return (
         <div className="flex-1 w-full h-[calc(100vh-100px)] relative bg-slate-50 dark:bg-slate-950">
+            {/* Control Bar */}
             <div className="absolute top-6 right-6 z-10 flex gap-3">
                  <button onClick={openUploadModal} className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-white font-bold shadow-xl shadow-${themeColor}-500/20 ${getColorClass(themeColor, 'bg')} hover:scale-105 transition-all`}>
                     <UploadCloud size={18}/> New Map
@@ -144,9 +165,7 @@ const MindMapContent: React.FC = () => {
                         maxZoom={1.5}
                         defaultEdgeOptions={{ type: 'smoothstep' }}
                         proOptions={{ hideAttribution: true }}
-                        onInit={(instance) => {
-                            setTimeout(() => instance.fitView(), 100);
-                        }}
+                        onInit={onInit}
                     >
                         <Background 
                             color="#94a3b8" 

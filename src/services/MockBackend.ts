@@ -352,7 +352,7 @@ class MockBackendService {
       this.save();
 
       const group = this.db.peerGroups.find(g => g.id === groupId);
-      const link = `${window.location.origin}/#/group?invite=${token}`;
+      const link = `${window.location.origin}/#/study/group?invite=${token}`;
       
       if (!isId) {
           await sendInviteEmail(emailOrId, link, this.db.user.name, group?.name || 'Study Group');

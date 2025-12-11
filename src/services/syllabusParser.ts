@@ -5,10 +5,14 @@ import { addMinutes } from '../utils/dateMath';
 
 export const parseContentToNodes = async (content: string, title: string): Promise<Node[]> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+        if (!apiKey) return [];
+
+        const ai = new GoogleGenAI({ apiKey });
         
+        // Using Pro for deep reasoning
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview',
             contents: `Analyze the following course content and break it down into a hierarchical learning roadmap.
             Estimate time (minutes) for each node based on complexity. Weight is 1-100 importance.
             Use deterministic logic for estimation if possible.
@@ -16,6 +20,7 @@ export const parseContentToNodes = async (content: string, title: string): Promi
             Course Title: ${title}
             Content: ${content.substring(0, 30000)} ... (truncated)`,
             config: {
+                thinkingConfig: { thinkingBudget: 2048 }, // Small budget for syllabus parsing reasoning
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.ARRAY,

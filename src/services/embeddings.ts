@@ -4,7 +4,12 @@ import { EmbeddingEntry, Node } from '../types';
 
 export const generateEmbeddings = async (nodes: Node[]): Promise<EmbeddingEntry[]> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) {
+            console.warn("API_KEY is missing for embeddings generation");
+            return [];
+        }
+        const ai = new GoogleGenAI({ apiKey });
         const entries: EmbeddingEntry[] = [];
 
         // Processing sequentially to avoid rate limits
@@ -16,7 +21,6 @@ export const generateEmbeddings = async (nodes: Node[]): Promise<EmbeddingEntry[
                 contents: [{ parts: [{ text: textToEmbed }] }],
             });
 
-            // Correct response access: response.embeddings[0].values
             if (result.embeddings && result.embeddings.length > 0 && result.embeddings[0].values) {
                 entries.push({
                     id: `emb_${node.id}`,
@@ -47,13 +51,16 @@ const cosineSimilarity = (vecA: number[], vecB: number[]) => {
 
 export const retrieveContext = async (query: string, embeddings: EmbeddingEntry[], topK: number = 5): Promise<EmbeddingEntry[]> => {
     try {
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const apiKey = process.env.API_KEY;
+        if (!apiKey) return [];
+
+        const ai = new GoogleGenAI({ apiKey });
         const result = await ai.models.embedContent({
             model: "text-embedding-004",
             contents: [{ parts: [{ text: query }] }],
         });
 
-        if (!result.embeddings || !result.embeddings[0] || !result.embeddings[0].values) return [];
+        if (!result.embeddings || result.embeddings.length === 0 || !result.embeddings[0].values) return [];
         const queryVector = result.embeddings[0].values;
 
         const scored = embeddings.map(entry => ({
@@ -61,7 +68,7 @@ export const retrieveContext = async (query: string, embeddings: EmbeddingEntry[
             score: cosineSimilarity(queryVector, entry.vector)
         }));
 
-        scored.sort((a, b) => b.score - a.score);
+        scored.sort((a, b) => (b as any).score - (a as any).score);
         return scored.slice(0, topK);
 
     } catch (e) {

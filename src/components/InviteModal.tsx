@@ -23,7 +23,7 @@ const InviteModal: React.FC<Props> = ({ groupId, onClose }) => {
         setStatus('sending');
         try {
             const token = await MockBackend.inviteToGroup(groupId, email);
-            setInviteLink(`${window.location.origin}/#/group?invite=${token}`);
+            setInviteLink(`${window.location.origin}/#/study/group?invite=${token}`);
             setStatus('sent');
         } catch (e) {
             console.error(e);
