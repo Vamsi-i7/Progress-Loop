@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { useStore, getColorClass } from '../context/StoreContext';
-import { Mic, MicOff, PhoneOff, Waveform } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, Activity } from 'lucide-react';
 
 interface Props {
     onClose: () => void;
@@ -13,13 +13,13 @@ const LiveSession: React.FC<Props> = ({ onClose }) => {
     const [isConnected, setIsConnected] = useState(false);
     const [isTalking, setIsTalking] = useState(false);
     const [status, setStatus] = useState("Connecting...");
-    
+
     // Refs for audio handling
     const videoRef = useRef<HTMLVideoElement>(null); // For future video support
     const audioContextRef = useRef<AudioContext | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const sessionRef = useRef<any>(null); // To store the session promise/object
-    
+
     let nextStartTime = 0;
     const sources = new Set<AudioBufferSourceNode>();
 
@@ -37,7 +37,7 @@ const LiveSession: React.FC<Props> = ({ onClose }) => {
 
         try {
             const ai = new GoogleGenAI({ apiKey });
-            
+
             // Audio Context Setup
             const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
             const audioCtx = new AudioContextClass({ sampleRate: 24000 });
@@ -48,12 +48,12 @@ const LiveSession: React.FC<Props> = ({ onClose }) => {
             // Input Stream
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
-            
+
             // Input Processing
             const inputAudioContext = new AudioContextClass({ sampleRate: 16000 });
             const source = inputAudioContext.createMediaStreamSource(stream);
             const scriptProcessor = inputAudioContext.createScriptProcessor(4096, 1, 1);
-            
+
             scriptProcessor.onaudioprocess = (e) => {
                 const inputData = e.inputBuffer.getChannelData(0);
                 const pcmBlob = createBlob(inputData);
@@ -64,7 +64,7 @@ const LiveSession: React.FC<Props> = ({ onClose }) => {
                     });
                 }
             };
-            
+
             source.connect(scriptProcessor);
             scriptProcessor.connect(inputAudioContext.destination);
 
@@ -79,7 +79,7 @@ const LiveSession: React.FC<Props> = ({ onClose }) => {
                     },
                     onmessage: async (message: LiveServerMessage) => {
                         // Handle Audio Output
-                        const base64Audio = message.serverContent?.modelTurn?.parts[0]?.inlineData?.data;
+                        const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
                         if (base64Audio) {
                             setIsTalking(true);
                             nextStartTime = Math.max(nextStartTime, audioCtx.currentTime);
@@ -100,7 +100,7 @@ const LiveSession: React.FC<Props> = ({ onClose }) => {
                             nextStartTime += audioBuffer.duration;
                             sources.add(source);
                         }
-                        
+
                         // Handle Interruption
                         if (message.serverContent?.interrupted) {
                             sources.forEach(s => { s.stop(); });
@@ -126,7 +126,7 @@ const LiveSession: React.FC<Props> = ({ onClose }) => {
                     systemInstruction: `You are an encouraging study companion for ${user.name}. Keep responses concise and helpful.`,
                 },
             });
-            
+
             sessionRef.current = sessionPromise;
 
         } catch (e) {
@@ -210,7 +210,7 @@ const LiveSession: React.FC<Props> = ({ onClose }) => {
                     </p>
 
                     <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center mb-8 transition-all duration-500 ${isTalking ? 'scale-110 shadow-[0_0_50px_rgba(99,102,241,0.5)]' : 'scale-100'} bg-slate-100 dark:bg-slate-800`}>
-                        {isTalking ? <Waveform size={48} className="text-indigo-500 animate-pulse" /> : <Mic size={40} className="text-slate-400" />}
+                        {isTalking ? <Activity size={48} className="text-indigo-500 animate-pulse" /> : <Mic size={40} className="text-slate-400" />}
                     </div>
 
                     <div className="flex justify-center gap-6">
