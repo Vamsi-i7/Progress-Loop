@@ -23,6 +23,7 @@ import MindMap from './pages/MindMap';
 import History from './pages/History';
 import AIMentor from './pages/AIMentor';
 import ImageGen from './pages/ImageGen';
+import VerifyEmail from './pages/VerifyEmail';
 
 // Layout for Authenticated Users (Shows Sidebar)
 const AppLayout: React.FC = () => {
@@ -30,7 +31,7 @@ const AppLayout: React.FC = () => {
     <div className="flex bg-slate-50 dark:bg-slate-950 min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300">
       <Sidebar />
       <div className="flex-1 min-w-0">
-        <Outlet /> 
+        <Outlet />
       </div>
     </div>
   );
@@ -44,46 +45,47 @@ const ProtectedRoute = () => {
 
 // Public Route Component
 const PublicRoute = ({ children }: { children?: React.ReactNode }) => {
-    const { isAuthenticated } = useStore();
-    return isAuthenticated ? <Navigate to="/dashboard" replace /> : <>{children}</>;
+  const { isAuthenticated } = useStore();
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : <>{children}</>;
 };
 
 const App: React.FC = () => {
   return (
     <StoreProvider>
       <Router>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-            <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+          <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+          <Route path="/verify/:token" element={<VerifyEmail />} />
 
-            <Route element={<ProtectedRoute />}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/goals" element={<Goals />} />
-                <Route path="/planner" element={<Planner />} />
-                <Route path="/progress" element={<Progress />} />
-                
-                {/* Nested Study Assistant Routes */}
-                <Route path="study">
-                    <Route path="mentor" element={<AIMentor />} />
-                    <Route path="studio" element={<ImageGen />} />
-                    <Route path="roadmap" element={<Roadmap />} />
-                    <Route path="flashcards" element={<Flashcards />} />
-                    <Route path="mindmap" element={<MindMap />} />
-                    <Route path="history" element={<History />} />
-                    <Route path="group" element={<GroupStudy />} />
-                </Route>
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/goals" element={<Goals />} />
+            <Route path="/planner" element={<Planner />} />
+            <Route path="/progress" element={<Progress />} />
 
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/subscription" element={<Subscription />} />
-                <Route path="/about" element={<About />} />
-                <Route path="/feedback" element={<Feedback />} />
-                <Route path="/support" element={<Support />} />
+            {/* Nested Study Assistant Routes */}
+            <Route path="study">
+              <Route path="mentor" element={<AIMentor />} />
+              <Route path="studio" element={<ImageGen />} />
+              <Route path="roadmap" element={<Roadmap />} />
+              <Route path="flashcards" element={<Flashcards />} />
+              <Route path="mindmap" element={<MindMap />} />
+              <Route path="history" element={<History />} />
+              <Route path="group" element={<GroupStudy />} />
             </Route>
-            
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/subscription" element={<Subscription />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/feedback" element={<Feedback />} />
+            <Route path="/support" element={<Support />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </Router>
     </StoreProvider>
   );

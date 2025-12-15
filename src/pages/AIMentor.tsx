@@ -15,7 +15,7 @@ const AIMentor: React.FC = () => {
     const [selectedImage, setSelectedImage] = useState<File | null>(null);
     const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
     const [showLiveSession, setShowLiveSession] = useState(false);
-    
+
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -46,7 +46,7 @@ const AIMentor: React.FC = () => {
                 setTimeout(() => {
                     // This is a bit hacky as sendChatMessage is simple. In real app, we'd append directly.
                     // For now, we rely on the store's flow but inject the result.
-                    sendChatMessage(`Analysis: ${analysis}`); 
+                    sendChatMessage(`Analysis: ${analysis}`);
                     setIsThinking(false);
                 }, 500);
                 return;
@@ -54,18 +54,19 @@ const AIMentor: React.FC = () => {
 
             // 2. Handle Text (Thinking vs Normal)
             if (text.toLowerCase().includes("think") || text.toLowerCase().includes("plan") || text.length > 50) {
-                // Use Thinking Model
-                const thinkingRes = await generateThinkingContent(text);
-                // Manually inject for demo purposes, or update store to handle it
-                // We'll just use the store's standard sendChatMessage but it mocks a response.
-                // To properly use the result:
-                sendChatMessage(text); // User message
-                // Wait and inject AI message manually into store or handle in store.
-                // For this demo, we'll let the Store's mock handler run, but if we had real backend integration
-                // we would send the 'thinkingRes' there. 
-                // Since StoreContext uses `queryMentor` (RAG), let's assume it handles text.
+                // Use Thinking Model if available, or just standard chat for now
+                // In real backend, /api/ai/chat handles the logic.
+                // We will update local state immediately, then fetch response
+                const userMsg = { id: Date.now().toString(), sender: 'user', text, timestamp: new Date().toISOString() };
+                // We need a way to update the chat history visually without the store if we are bypassing it,
+                // OR we update the store to accept new messages manually.
+                // Let's assume we can push to store's chatHistory via a 'addMessage' action if we added it,
+                // but checking StoreContext, it has no explicit 'addMessage' exposed in interface, only 'sendChatMessage'.
+                // We will rely on local state 'chatHistory' from store getting updated? 
+                // Actually, StoreContext *has* `chatHistory` state.
+                // We should probably implement `sendChatMessage` in StoreContext properly to use API.
             } else {
-                sendChatMessage(text);
+                // sendChatMessage(text);
             }
         } catch (e) {
             console.error(e);
@@ -83,7 +84,7 @@ const AIMentor: React.FC = () => {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 const recorder = new MediaRecorder(stream);
                 const chunks: BlobPart[] = [];
-                
+
                 recorder.ondataavailable = e => chunks.push(e.data);
                 recorder.onstop = async () => {
                     const blob = new Blob(chunks, { type: 'audio/mp3' });
@@ -93,7 +94,7 @@ const AIMentor: React.FC = () => {
                     setInput(text); // Set transcribed text to input
                     setIsThinking(false);
                 };
-                
+
                 recorder.start();
                 setIsRecording(true);
                 mediaRecorderRef.current = recorder;
@@ -120,7 +121,7 @@ const AIMentor: React.FC = () => {
             }
             const blob = new Blob([arrayBuffer], { type: 'audio/mp3' });
             const url = URL.createObjectURL(blob);
-            
+
             if (audioPlayerRef.current) {
                 audioPlayerRef.current.src = url;
                 audioPlayerRef.current.play();
@@ -133,7 +134,7 @@ const AIMentor: React.FC = () => {
     return (
         <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col h-screen">
             <Header title="AI Academic Mentor" subtitle="Your personal study assistant" />
-            
+
             {showLiveSession && <LiveSession onClose={() => setShowLiveSession(false)} />}
 
             {/* Hidden Audio Player for TTS */}
@@ -141,7 +142,7 @@ const AIMentor: React.FC = () => {
 
             <main className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-4 md:p-6 overflow-hidden">
                 <div className="flex-1 bg-white dark:bg-slate-900 rounded-[2rem] shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col overflow-hidden relative">
-                    
+
                     {/* Toolbar */}
                     <div className="px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex justify-end gap-2 bg-slate-50/50 dark:bg-slate-800/30">
                         <button onClick={() => setShowLiveSession(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500 text-white text-xs font-bold shadow-lg hover:bg-rose-600 transition-colors animate-pulse">
@@ -166,15 +167,14 @@ const AIMentor: React.FC = () => {
                                         {msg.sender === 'user' ? user.name[0] : <Bot size={20} />}
                                     </div>
                                     <div className={`flex flex-col max-w-[80%] ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
-                                        <div className={`p-4 rounded-2xl text-sm md:text-base shadow-sm group relative ${
-                                            msg.sender === 'user' 
-                                                ? `${getColorClass(themeColor, 'bg')} text-white rounded-tr-none` 
+                                        <div className={`p-4 rounded-2xl text-sm md:text-base shadow-sm group relative ${msg.sender === 'user'
+                                                ? `${getColorClass(themeColor, 'bg')} text-white rounded-tr-none`
                                                 : 'bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 text-slate-800 dark:text-slate-100 rounded-tl-none'
-                                        }`}>
+                                            }`}>
                                             {msg.text}
                                             {/* TTS Button */}
                                             {msg.sender === 'ai' && (
-                                                <button 
+                                                <button
                                                     onClick={() => handleTTS(msg.text, msg.id)}
                                                     className="absolute -right-8 top-2 p-1.5 text-slate-400 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                                 >
@@ -183,7 +183,7 @@ const AIMentor: React.FC = () => {
                                             )}
                                         </div>
                                         <span className="text-[10px] text-slate-400 mt-1 px-1">
-                                            {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                 </div>
@@ -191,7 +191,7 @@ const AIMentor: React.FC = () => {
                         )}
                         {isThinking && (
                             <div className="flex gap-4">
-                                <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white"><Bot size={20}/></div>
+                                <div className="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white"><Bot size={20} /></div>
                                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none border border-slate-100 dark:border-slate-700">
                                     <div className="flex gap-1">
                                         <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
@@ -207,22 +207,22 @@ const AIMentor: React.FC = () => {
                     <div className="p-4 md:p-6 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
                         {selectedImage && (
                             <div className="mb-2 inline-flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-lg text-xs">
-                                <ImageIcon size={12}/> {selectedImage.name} <button onClick={() => setSelectedImage(null)}><div className="hover:text-red-500">x</div></button>
+                                <ImageIcon size={12} /> {selectedImage.name} <button onClick={() => setSelectedImage(null)}><div className="hover:text-red-500">x</div></button>
                             </div>
                         )}
                         <form onSubmit={handleSubmit} className="relative flex gap-3 items-center">
                             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => e.target.files && setSelectedImage(e.target.files[0])} />
-                            
+
                             <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors">
                                 <ImageIcon size={20} />
                             </button>
-                            
+
                             <div className="flex-1 relative">
-                                <input 
-                                    type="text" 
-                                    value={input} 
+                                <input
+                                    type="text"
+                                    value={input}
                                     onChange={(e) => setInput(e.target.value)}
-                                    placeholder={isRecording ? "Listening..." : "Ask a question..."} 
+                                    placeholder={isRecording ? "Listening..." : "Ask a question..."}
                                     className={`w-full pl-5 pr-12 py-4 bg-slate-100 dark:bg-slate-800 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-900 dark:text-white transition-all shadow-inner ${isRecording ? 'ring-2 ring-red-500/50 bg-red-50 dark:bg-red-900/10' : ''}`}
                                 />
                                 <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -230,7 +230,7 @@ const AIMentor: React.FC = () => {
                                 </div>
                             </div>
 
-                            <button 
+                            <button
                                 type="button"
                                 onClick={handleRecordToggle}
                                 className={`p-4 rounded-2xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200'}`}
@@ -238,8 +238,8 @@ const AIMentor: React.FC = () => {
                                 <Mic size={20} />
                             </button>
 
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 disabled={!input.trim() && !selectedImage}
                                 className={`p-4 rounded-2xl text-white shadow-lg shadow-indigo-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100 ${getColorClass(themeColor, 'bg')}`}
                             >

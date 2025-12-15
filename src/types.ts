@@ -2,45 +2,54 @@
 export type ThemeColor = 'blue' | 'violet' | 'emerald' | 'rose' | 'amber';
 
 export interface FriendRequest {
-    id: string;
-    fromUserId: string;
-    fromUserName: string;
-    toUserId: string;
-    status: 'pending' | 'accepted' | 'declined';
-    createdAt: string;
+  id: string;
+  fromUserId: string;
+  fromUserName: string;
+  toUserId: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: string;
 }
 
 export interface User {
-  id: string;
+  id: string; // UUID
+  username: string; // Unique
   name: string;
-  username: string;
   email: string;
-  avatar?: string;
+  avatar?: string; // avatar_url
+
+  // Gamification & Social (New Schema)
+  xp_points: number; // default 0
+  current_streak: number; // default 0
+  study_group_id?: string; // UUID (Wolfpack)
+  mentor_id?: string; // UUID (Link to User)
+
+  // Legacy/Frontend fields (Keep for compatibility until full migration)
   plan: 'free' | 'pro' | 'premium';
   joinedDate: string;
   lastActiveDate: string;
-  xp: number;
+  xp: number; // Deprecated by xp_points? Keep synced for now.
   maxXp: number;
   level: number;
   hearts: number;
-  streak: number;
+  streak: number; // Deprecated by current_streak?
+
   // Advanced AI Extensions
   survivalMode?: boolean;
   cognitiveLoadScore?: number; // 0-100
   focusScore?: number;
-  
+
   // Subscription & Quota
   stripeCustomerId?: string;
   subscriptionStatus?: 'active' | 'canceled' | 'past_due';
   subscriptionPeriodEnd?: number;
   aiQuotaLimit?: number;
   uploadsLimit?: number;
-  
+
   // Usage tracking
   usage: {
-      aiTokensUsed: number;
-      uploadsUsed: number;
-      lastReset: string;
+    aiTokensUsed: number;
+    uploadsUsed: number;
+    lastReset: string;
   };
 
   // Social
@@ -48,6 +57,45 @@ export interface User {
   friendRequests: string[]; // Request IDs
 }
 
+// --- MASTER GRID TYPES (Strict) ---
+
+export type TaskStatus = 'Not Started' | 'In Progress' | 'Blocked' | 'Reviewing' | 'Done';
+export type TaskPriority = 'High' | 'Medium' | 'Low';
+export type EnergyLevel = 'High Focus' | 'Low Energy';
+
+export interface Task {
+  id: string; // UUID
+  user_id: string; // UUID
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  energy_level: EnergyLevel;
+  due_date: string; // ISO Date string
+  do_date?: string; // ISO Date string (Planned execution)
+  estimated_minutes: number;
+  actual_minutes: number;
+  subject_tag: string; // e.g., 'Math', 'Coding'
+  is_missed: boolean; // Triggered by cron if due_date passes
+}
+
+// --- HABIT TRACKING (Strict) ---
+
+export interface Habit {
+  id: string; // UUID
+  user_id: string; // UUID
+  title: string;
+  weight: number; // 1-10 Scale
+  frequency_goal: number; // e.g., 5 times per week
+}
+
+export interface HabitLog {
+  id: string; // UUID
+  habit_id: string; // UUID
+  date: string; // Date string YYYY-MM-DD
+  status: boolean; // true = completed
+}
+
+// Legacy interfaces kept for compatibility during migration
 export interface Notification {
   id: string;
   title: string;
@@ -60,7 +108,8 @@ export interface Notification {
 export type GoalType = 'daily' | 'monthly' | 'yearly';
 export type GoalCategory = 'short-term' | 'long-term';
 
-export interface Habit {
+// Deprecated Goal/Habit (Legacy) - Consider removing after full migration
+export interface LegacyHabit {
   id: string;
   title: string;
   completed: boolean;
@@ -73,7 +122,7 @@ export interface Goal {
   type: GoalType;
   category: GoalCategory;
   progress: number; // 0-100
-  habits: Habit[];
+  habits: LegacyHabit[];
   color?: string;
 }
 
@@ -118,45 +167,45 @@ export interface Transaction {
 }
 
 export interface BusySlot {
-    start: Date;
-    end: Date;
-    title?: string;
+  start: Date;
+  end: Date;
+  title?: string;
 }
 
 export interface ScheduledBlock {
-    id: string;
-    taskId: string;
-    planId: string;
-    start: Date;
-    end: Date;
-    assignedDay: string;
-    nodeId?: string;
+  id: string;
+  taskId: string;
+  planId: string;
+  start: Date;
+  end: Date;
+  assignedDay: string;
+  nodeId?: string;
 }
 
 export interface RiskReport {
-    taskId: string;
-    pMiss: number;
-    riskLevel: 'low' | 'medium' | 'high';
-    reasons: string[];
+  taskId: string;
+  pMiss: number;
+  riskLevel: 'low' | 'medium' | 'high';
+  reasons: string[];
 }
 
 export interface RescheduleProposal {
-    taskId: string;
-    originalSlot?: ScheduledBlock;
-    proposedSlot: ScheduledBlock;
-    reason: string;
+  taskId: string;
+  originalSlot?: ScheduledBlock;
+  proposedSlot: ScheduledBlock;
+  reason: string;
 }
 
 export interface AIMetrics {
-    plannedTasks: number;
-    completedTasks: number;
-    totalSlippage: number;
-    reschedules: number;
-    predictedFailures: number;
-    examReadiness?: number;
-    consistencyScore?: number;
-    predictedScore?: number;
-    requiredEffortGap?: number;
+  plannedTasks: number;
+  completedTasks: number;
+  totalSlippage: number;
+  reschedules: number;
+  predictedFailures: number;
+  examReadiness?: number;
+  consistencyScore?: number;
+  predictedScore?: number;
+  requiredEffortGap?: number;
 }
 
 // --- GROUP STUDY TYPES ---
@@ -165,19 +214,19 @@ export interface GroupMember {
   userId: string;
   role: 'owner' | 'admin' | 'member';
   joinedAt: string;
-  name?: string; 
+  name?: string;
   avatar?: string;
   status?: 'online' | 'offline' | 'studying';
 }
 
 export interface GroupAttachment {
-    id: string;
-    name: string;
-    url: string;
-    type: string;
-    size?: number;
-    uploadedBy: string;
-    uploadedAt: string;
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  size?: number;
+  uploadedBy: string;
+  uploadedAt: string;
 }
 
 export interface GroupMessage {
@@ -204,7 +253,7 @@ export interface PeerGroup {
   createdAt: string;
   settings: { allowInvites: boolean; requireApproval: boolean };
   // Mock backend storage helpers
-  messages?: GroupMessage[]; 
+  messages?: GroupMessage[];
   attachments?: GroupAttachment[];
   sessions?: GroupSession[];
   sharedRoadmaps?: string[]; // IDs of roadmaps
@@ -244,7 +293,7 @@ export interface ChatMessage {
   id: string;
   sender: 'user' | 'ai';
   text: string;
-  timestamp: string; 
+  timestamp: string;
   sources?: string[];
   imageUrl?: string;
   audioUrl?: string; // For TTS or voice replies
@@ -271,7 +320,7 @@ export type Roadmap = {
   title: string;
   nodes: Node[];
   generatedAt: string;
-  timetable?: ScheduledBlock[]; 
+  timetable?: ScheduledBlock[];
 };
 
 export type Flashcard = {
